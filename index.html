@@ -3,6 +3,12 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  
+  <!-- Cache Control to ensure instant GitHub updates -->
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+
   <title>Attendance Portal</title>
   <link rel="manifest" href="manifest.json">
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -37,7 +43,6 @@
       margin: 0 auto;
     }
 
-    /* Minimalist Card */
     .card-custom {
       background: var(--card-bg);
       border: 1px solid var(--border-color);
@@ -81,7 +86,6 @@
       border-color: #bfdbfe;
     }
 
-    /* Form Controls */
     .form-label {
       font-weight: 600;
       font-size: 0.8rem;
@@ -118,7 +122,6 @@
       cursor: not-allowed;
     }
 
-    /* Segmented Control for Check-In / Check-Out */
     .segmented-control {
       display: flex;
       background-color: #f1f5f9;
@@ -150,7 +153,6 @@
       box-shadow: 0 2px 8px rgba(37, 99, 235, 0.25);
     }
 
-    /* Icon Refresh Button */
     .btn-refresh-icon {
       background: #f1f5f9;
       border: 1px solid var(--border-color);
@@ -181,7 +183,6 @@
       transform: rotate(180deg);
     }
 
-    /* Map Styling */
     #mapContainer {
       height: 170px;
       border-radius: 14px;
@@ -191,7 +192,6 @@
       z-index: 1;
     }
 
-    /* Submit Button */
     .btn-submit {
       background-color: var(--primary);
       border: none;
@@ -207,7 +207,6 @@
       background-color: var(--primary-hover);
     }
 
-    /* Modern Modal */
     .popup-backdrop {
       position: fixed;
       top: 0; left: 0;
@@ -257,7 +256,7 @@
 
 <div class="container app-container">
 
-  <!-- Top Status & Pending Sync Chip Header -->
+  <!-- Top Status Bar with Pending Queue Chip -->
   <div class="status-bar">
     <span id="networkStatus" class="chip-badge chip-online">● Online</span>
     <span id="queueStatus" class="chip-badge chip-sync">Sync Queue: 0</span>
@@ -266,7 +265,7 @@
   <div class="card-custom">
     <div class="text-center mb-4">
       <h5 class="fw-bold m-0" style="color: var(--text-main);">Attendance Portal</h5>
-      <p class="text-muted small m-0 mt-1">Automatic GPS Location & Time Tracking</p>
+      <p class="text-muted small m-0 mt-1">Automatic Location & Time Synchronization</p>
     </div>
 
     <form id="attendanceForm">
@@ -331,13 +330,13 @@
         </div>
       </div>
 
-      <!-- 8. Automatic Date & Time Field -->
+      <!-- 8. Current Date & Time -->
       <div class="mb-3">
         <label class="form-label">Current Date & Time</label>
         <input type="text" id="timeDisplay" class="form-control" readonly placeholder="Capturing time...">
       </div>
 
-      <!-- 9. Automatic Location Field (Without Lat: / Long: prefix) -->
+      <!-- 9. Location (Clean format without Lat: or Long: prefixes) -->
       <div class="mb-2">
         <div class="d-flex justify-content-between align-items-center mb-1">
           <label class="form-label m-0">Location</label>
@@ -360,7 +359,6 @@
         <textarea id="remarks" class="form-control" rows="2" placeholder="Write any optional notes..."></textarea>
       </div>
 
-      <!-- 12. Submit Button -->
       <button type="submit" id="submitBtn" class="btn btn-submit w-100">Submit Attendance</button>
     </form>
   </div>
@@ -388,8 +386,28 @@
   let capturedLat = null;
   let capturedLng = null;
 
+  // Auto-Update Engine
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('./sw.js').catch(err => console.log('SW Registration:', err));
+    navigator.serviceWorker.register('./sw.js').then(reg => {
+      reg.update(); // Check for GitHub updates on every page launch
+
+      reg.onupdatefound = () => {
+        const installingWorker = reg.installing;
+        installingWorker.onstatechange = () => {
+          if (installingWorker.state === 'installed' && navigator.serviceWorker.controller) {
+            window.location.reload();
+          }
+        };
+      };
+    }).catch(err => console.log('SW Error:', err));
+
+    let refreshing = false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (!refreshing) {
+        refreshing = true;
+        window.location.reload();
+      }
+    });
   }
 
   window.addEventListener('load', () => {
@@ -445,7 +463,6 @@
       (position) => {
         capturedLat = position.coords.latitude.toFixed(6);
         capturedLng = position.coords.longitude.toFixed(6);
-        // Clean format without "Lat:" and "Long:"
         locInput.value = `${capturedLat}, ${capturedLng}`;
 
         const latLng = [parseFloat(capturedLat), parseFloat(capturedLng)];
@@ -458,7 +475,6 @@
         }
       },
       (error) => {
-        // Fallback: Low accuracy location
         navigator.geolocation.getCurrentPosition(
           (fallbackPos) => {
             capturedLat = fallbackPos.coords.latitude.toFixed(6);
@@ -641,7 +657,7 @@
     return s.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());
   }
 
-  // --- OFFLINE SAME DAY VALIDATION ---
+  // --- LOCAL OFFLINE VALIDATION ---
   function validateOfflineFlow(name, type, todayStr) {
     const queue = JSON.parse(localStorage.getItem('offline_attendance_queue') || '[]');
     const todayRecords = queue.filter(r => 
@@ -664,7 +680,7 @@
     return { valid: true };
   }
 
-  // --- FORM SUBMIT HANDLER ---
+  // --- FORM SUBMISSION HANDLER ---
   document.getElementById('attendanceForm').addEventListener('submit', function(e) {
     e.preventDefault();
 
@@ -710,7 +726,6 @@
     if (navigator.onLine) {
       sendToServer(record);
     } else {
-      // Local queue validation
       const check = validateOfflineFlow(name, type, todayStr);
       if (!check.valid) {
         showPopup("Validation Error", check.msg, "error");
@@ -791,7 +806,6 @@
     fetchGPSLocation();
   }
 
-  // --- POPUP CONTROLLER ---
   function showPopup(title, message, type = "error") {
     const modal = document.getElementById('popupModal');
     const card = document.getElementById('popupCard');

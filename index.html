@@ -120,6 +120,7 @@
       cursor: not-allowed;
     }
 
+    /* SEGMENTED CONTROL & YELLOW LEAVE BUTTON */
     .segmented-control {
       display: flex;
       background-color: #f1f5f9;
@@ -152,6 +153,13 @@
       box-shadow: 0 2px 8px rgba(37, 99, 235, 0.25);
     }
 
+    /* YELLOW STYLING FOR LEAVE BUTTON WHEN SELECTED */
+    .segmented-control input[id="typeLeave"]:checked + label {
+      background-color: #eab308 !important;
+      color: #0f172a !important;
+      box-shadow: 0 2px 8px rgba(234, 179, 8, 0.35) !important;
+    }
+
     .btn-refresh-icon {
       background: #f1f5f9;
       border: 1px solid var(--border-color);
@@ -170,12 +178,6 @@
     .btn-refresh-icon:hover {
       background: #e2e8f0;
       color: var(--primary);
-    }
-
-    .btn-refresh-icon svg {
-      width: 14px;
-      height: 14px;
-      transition: transform 0.4s ease;
     }
 
     .btn-refresh-icon:active svg {
@@ -268,7 +270,13 @@
 
     <form id="attendanceForm">
       
-      <!-- 1. Project -->
+      <!-- User Email Input -->
+      <div class="mb-3">
+        <label class="form-label">Official Email Address <span class="text-danger">*</span></label>
+        <input type="email" id="userEmail" class="form-control" placeholder="name@organization.com" required onchange="localStorage.setItem('saved_user_email', this.value)">
+      </div>
+
+      <!-- Project -->
       <div class="mb-3">
         <label class="form-label">Project <span class="text-danger">*</span></label>
         <select id="project" class="form-select" onchange="onProjectChange()" required>
@@ -276,7 +284,7 @@
         </select>
       </div>
 
-      <!-- 2. Organization -->
+      <!-- Organization -->
       <div class="mb-3">
         <label class="form-label">Organization <span class="text-danger">*</span></label>
         <select id="organization" class="form-select" onchange="onOrganizationChange()" required disabled>
@@ -284,7 +292,7 @@
         </select>
       </div>
 
-      <!-- 3. District -->
+      <!-- District -->
       <div class="mb-3">
         <label class="form-label">District <span class="text-danger">*</span></label>
         <select id="district" class="form-select" onchange="onDistrictChange()" required disabled>
@@ -292,7 +300,7 @@
         </select>
       </div>
 
-      <!-- 4. Union Council -->
+      <!-- Union Council -->
       <div class="mb-3">
         <label class="form-label">Union Council <span class="text-danger">*</span></label>
         <select id="unionCouncil" class="form-select" onchange="onUnionCouncilChange()" required disabled>
@@ -300,7 +308,7 @@
         </select>
       </div>
 
-      <!-- 5. Full Name -->
+      <!-- Full Name -->
       <div class="mb-3">
         <label class="form-label">Full Name <span class="text-danger">*</span></label>
         <select id="fullName" class="form-select" onchange="onFullNameChange()" required disabled>
@@ -308,7 +316,7 @@
         </select>
       </div>
 
-      <!-- 6. Designation -->
+      <!-- Designation -->
       <div class="mb-3">
         <label class="form-label">Designation <span class="text-danger">*</span></label>
         <select id="designation" class="form-select" required disabled>
@@ -316,7 +324,7 @@
         </select>
       </div>
 
-      <!-- 7. Attendance Type (Includes Leave Option) -->
+      <!-- Attendance Type with Yellow Leave -->
       <div class="mb-3">
         <label class="form-label d-block">Attendance Type <span class="text-danger">*</span></label>
         <div class="segmented-control">
@@ -331,18 +339,18 @@
         </div>
       </div>
 
-      <!-- 8. Current Date & Time -->
+      <!-- Current Time -->
       <div class="mb-3">
         <label class="form-label">Current Date & Time</label>
         <input type="text" id="timeDisplay" class="form-control" readonly placeholder="Capturing time...">
       </div>
 
-      <!-- 9. Location -->
+      <!-- Location -->
       <div class="mb-2">
         <div class="d-flex justify-content-between align-items-center mb-1">
           <label class="form-label m-0">Location</label>
           <button type="button" class="btn-refresh-icon" title="Refresh Location" onclick="fetchGPSLocation()">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" width="14" height="14">
               <path d="M21.5 2v6h-6M2.5 22v-6h6"/>
               <path d="M2 11.5a10 10 0 0 1 18.8-4.3L21.5 8M22 12.5a10 10 0 0 1-18.8 4.2L2.5 16"/>
             </svg>
@@ -351,10 +359,9 @@
         <input type="text" id="locationDisplay" class="form-control" readonly placeholder="Acquiring GPS coordinates...">
       </div>
 
-      <!-- 10. Map -->
       <div id="mapContainer"></div>
 
-      <!-- 11. Remarks -->
+      <!-- Remarks -->
       <div class="mb-4">
         <label class="form-label">Remarks <span class="text-muted fw-normal">(Optional / Reason for Leave)</span></label>
         <textarea id="remarks" class="form-control" rows="2" placeholder="Write any optional notes..."></textarea>
@@ -386,11 +393,14 @@
   let capturedLat = null;
   let capturedLng = null;
 
-  // Auto-Update Engine
+  // Monotonic time trackers for offline time-tampering detection
+  let basePerfTime = performance.now();
+  let baseRealTime = Date.now();
+  let maxObservedTime = Number(localStorage.getItem('max_observed_timestamp') || Date.now());
+
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('./sw.js').then(reg => {
       reg.update();
-
       reg.onupdatefound = () => {
         const installingWorker = reg.installing;
         installingWorker.onstatechange = () => {
@@ -399,7 +409,7 @@
           }
         };
       };
-    }).catch(err => console.log('SW Error:', err));
+    });
 
     let refreshing = false;
     navigator.serviceWorker.addEventListener('controllerchange', () => {
@@ -411,6 +421,12 @@
   }
 
   window.addEventListener('load', () => {
+    // Restore saved user email
+    const savedEmail = localStorage.getItem('saved_user_email');
+    if (savedEmail) {
+      document.getElementById('userEmail').value = savedEmail;
+    }
+
     updateNetworkStatus();
     initClock();
     initLeafletMap();
@@ -418,7 +434,12 @@
     loadRosterData();
   });
 
-  window.addEventListener('online', updateNetworkStatus);
+  // INSTANT AUTO-SYNC WHEN CONNECTING TO INTERNET (NO REFRESH REQUIRED)
+  window.addEventListener('online', () => {
+    updateNetworkStatus();
+    syncOfflineQueue(); // Immediately executes sync on reconnection
+  });
+
   window.addEventListener('offline', updateNetworkStatus);
 
   function initClock() {
@@ -431,6 +452,87 @@
     const pad = n => String(n).padStart(2, '0');
     const formatted = `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
     document.getElementById('timeDisplay').value = formatted;
+  }
+
+  // OFFLINE TIME TAMPERING DETECTION ENGINE
+  function isTimeTamperedOffline() {
+    const now = Date.now();
+
+    // 1. Clock setting back detection
+    if (now < maxObservedTime - 60000) {
+      return true;
+    }
+
+    if (now > maxObservedTime) {
+      localStorage.setItem('max_observed_timestamp', String(now));
+      maxObservedTime = now;
+    }
+
+    // 2. Hardware clock vs System time drift check
+    const perfElapsed = (performance.now() - basePerfTime) / 1000;
+    const realElapsed = (now - baseRealTime) / 1000;
+
+    if (Math.abs(realElapsed - perfElapsed) > 120) { // Time jump > 2 mins
+      return true;
+    }
+
+    return false;
+  }
+
+  // OFFLINE CHECK-IN / CHECK-OUT / LEAVE VALIDATION ENGINE
+  function checkOfflineValidation(record) {
+    const localLogs = JSON.parse(localStorage.getItem('local_today_logs') || '[]');
+    const recordDate = record.time.split(' ')[0];
+
+    const todayUserLogs = localLogs.filter(item => 
+      item.fullName.trim().toLowerCase() === record.fullName.trim().toLowerCase() && 
+      item.time.split(' ')[0] === recordDate
+    );
+
+    const hasCheckIn = todayUserLogs.some(item => item.type === 'Check-In');
+    const hasCheckOut = todayUserLogs.some(item => item.type === 'Check-Out');
+    const hasLeave = todayUserLogs.some(item => item.type === 'Leave');
+
+    if (record.type === 'Leave') {
+      if (hasLeave || hasCheckIn || hasCheckOut) {
+        return { valid: false, message: `Leave Denied: Attendance or leave record already exists for ${record.fullName} today (${recordDate}).` };
+      }
+    }
+
+    if (record.type === 'Check-In') {
+      if (hasLeave) {
+        return { valid: false, message: `Check-In Denied: Leave has already been recorded for ${record.fullName} today (${recordDate}).` };
+      }
+      if (hasCheckIn) {
+        return { valid: false, message: `Check-In Denied: ${record.fullName} has already checked in today (${recordDate}).` };
+      }
+
+      // Offline 9:00 AM check-in cut-off rule
+      const now = new Date();
+      if (now.getHours() > 9 || (now.getHours() === 9 && now.getMinutes() > 0)) {
+        return { valid: false, message: "Check-In Denied: Check-In is strictly closed after 9:00 AM." };
+      }
+    }
+
+    if (record.type === 'Check-Out') {
+      if (hasLeave) {
+        return { valid: false, message: `Check-Out Denied: Leave has already been recorded for ${record.fullName} today (${recordDate}).` };
+      }
+      if (!hasCheckIn) {
+        return { valid: false, message: `Check-Out Denied: ${record.fullName} has not checked in today (${recordDate}).` };
+      }
+      if (hasCheckOut) {
+        return { valid: false, message: `Check-Out Denied: ${record.fullName} has already checked out today (${recordDate}).` };
+      }
+    }
+
+    return { valid: true };
+  }
+
+  function saveLocalLogHistory(record) {
+    let localLogs = JSON.parse(localStorage.getItem('local_today_logs') || '[]');
+    localLogs.push(record);
+    localStorage.setItem('local_today_logs', JSON.stringify(localLogs));
   }
 
   function initLeafletMap() {
@@ -449,7 +551,6 @@
 
     navigator.geolocation.getCurrentPosition(
       (position) => {
-        // Location Tampering Detection Check
         if (position.coords.accuracy > 1500) {
           locInput.value = "Location Tampering Detected / Mock GPS";
           showPopup("GPS Warning", "Mock GPS or inaccurate location detected. Please enable high-accuracy real GPS.", "error");
@@ -479,7 +580,6 @@
     if (navigator.onLine) {
       statusEl.className = "chip-badge chip-online";
       statusEl.textContent = "● Online";
-      syncOfflineQueue();
     } else {
       statusEl.className = "chip-badge chip-offline";
       statusEl.textContent = "● Offline";
@@ -634,8 +734,20 @@
   document.getElementById('attendanceForm').addEventListener('submit', function(e) {
     e.preventDefault();
 
+    // 1. OFFLINE / ONLINE TIME TAMPERING CHECK
+    if (isTimeTamperedOffline()) {
+      showPopup("Submission Blocked", "Time Tampering Detected! You cannot submit your response with time tampering. Please set your phone clock to automatic network time.", "error");
+      return;
+    }
+
+    const email = document.getElementById('userEmail').value.trim();
     const timeVal = document.getElementById('timeDisplay').value;
     const locVal = document.getElementById('locationDisplay').value;
+
+    if (!email) {
+      showPopup("Missing Email", "Please enter your official email address.", "error");
+      return;
+    }
 
     if (!locVal || locVal.includes("Acquiring") || locVal.includes("Denied") || locVal.includes("Unavailable") || locVal.includes("Tampering")) {
       showPopup("Location Error", "Valid GPS coordinates are required. Tap the refresh icon to acquire location.", "error");
@@ -658,7 +770,7 @@
 
     const record = {
       uid: 'UID-' + Date.now(),
-      email: 'pwa-user@app.local',
+      email: email, // Real user email captured
       project: proj,
       organization: org,
       district: dist,
@@ -671,7 +783,21 @@
       remarks: remarks
     };
 
-    sendToServer(record);
+    // 2. LOCAL OFFLINE DUPLICATE & LEAVE VALIDATION
+    const offlineCheck = checkOfflineValidation(record);
+    if (!offlineCheck.valid) {
+      showPopup("Submission Blocked", offlineCheck.message, "error");
+      return;
+    }
+
+    if (navigator.onLine) {
+      sendToServer(record);
+    } else {
+      saveLocally(record);
+      saveLocalLogHistory(record);
+      showPopup("Saved Offline", "Offline mode active. Record queued and will sync automatically when online.", "success");
+      resetForm();
+    }
   });
 
   function sendToServer(record) {
@@ -689,11 +815,13 @@
       btn.textContent = "Submit Attendance";
 
       if (res.status === 'SUCCESS') {
+        saveLocalLogHistory(record);
         showPopup("Success", `${record.type} recorded for ${record.fullName}!`, "success");
         resetForm();
       } 
       else if (res.status === 'SUCCESS_LEAVE') {
-        // LEAVE LOGIC: REDIRECT TO GMAIL / MAIL CLIENT
+        saveLocalLogHistory(record);
+
         const hrEmail = (res.emails && res.emails.hr) ? res.emails.hr : '';
         const ccEmails = [];
         if (res.emails && res.emails.sbcc) ccEmails.push(res.emails.sbcc);
@@ -726,6 +854,7 @@
         showPopup("Submission Blocked", res.message, "error");
       } else {
         saveLocally(record);
+        saveLocalLogHistory(record);
         showPopup("Saved Offline", "Server error. Saved to offline queue.", "success");
         resetForm();
       }
@@ -734,6 +863,7 @@
       btn.disabled = false;
       btn.textContent = "Submit Attendance";
       saveLocally(record);
+      saveLocalLogHistory(record);
       showPopup("Saved Offline", "Network issue. Saved to offline queue.", "success");
       resetForm();
     });
@@ -746,29 +876,38 @@
     updateQueueBadge();
   }
 
+  // AUTOMATIC INSTANT SYNC WITHOUT REFRESH
   function syncOfflineQueue() {
     let queue = JSON.parse(localStorage.getItem('offline_attendance_queue') || '[]');
     if (queue.length === 0) return;
 
     let completed = 0;
+    const total = queue.length;
+
     queue.forEach(record => {
       fetch(GAS_API_URL, {
         method: 'POST',
         body: JSON.stringify({ action: 'submitAttendance', record: record })
       })
+      .then(res => res.json())
       .then(() => {
         completed++;
-        if (completed === queue.length) {
+        if (completed === total) {
           localStorage.setItem('offline_attendance_queue', JSON.stringify([]));
           updateQueueBadge();
-          showPopup("Queue Synced", "All pending offline records synced to Google Sheets!", "success");
+          showPopup("Queue Synced", "All pending offline records synced to Google Sheets automatically!", "success");
         }
+      })
+      .catch(() => {
+        // Keeps remaining unsynced records in queue if connection drops midway
       });
     });
   }
 
   function resetForm() {
+    const savedEmail = document.getElementById('userEmail').value;
     document.getElementById('attendanceForm').reset();
+    document.getElementById('userEmail').value = savedEmail;
     document.getElementById('typeIn').checked = true;
     initProjectDropdown();
     fetchGPSLocation();

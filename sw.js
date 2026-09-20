@@ -1,4 +1,4 @@
-const CACHE_NAME = 'attendance-v3'; // Increment version number to force instant browser cache purging
+const CACHE_NAME = 'attendance-v4'; // Incremented cache version for immediate auto-update
 
 const ASSETS_TO_CACHE = [
   './',
@@ -10,7 +10,6 @@ const ASSETS_TO_CACHE = [
   'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js'
 ];
 
-// 1. Install Event - Force immediate activation
 self.addEventListener('install', (event) => {
   self.skipWaiting();
   event.waitUntil(
@@ -20,7 +19,6 @@ self.addEventListener('install', (event) => {
   );
 });
 
-// 2. Activate Event - Purge old cached versions immediately
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((cacheNames) => {
@@ -35,7 +33,6 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-// 3. Fetch Event - Network First Strategy
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET' || event.request.url.includes('script.google.com')) {
     return;

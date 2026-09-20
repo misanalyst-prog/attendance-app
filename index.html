@@ -7,21 +7,21 @@
   <link rel="manifest" href="manifest.json">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  
+  <!-- Leaflet Map CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
   <meta name="theme-color" content="#2563eb">
 
   <style>
     :root {
-      --bg-surface: #0f172a;
       --card-bg: #ffffff;
       --text-main: #1e293b;
       --text-muted: #64748b;
       --accent-color: #2563eb;
       --accent-hover: #1d4ed8;
-      --border-color: #e2e8f0;
-      --success-bg: #dcfce7;
-      --success-text: #166534;
-      --warning-bg: #fef3c7;
-      --warning-text: #92400e;
+      --border-color: #cbd5e1;
+      --readonly-bg: #f1f5f9;
     }
 
     body {
@@ -42,7 +42,7 @@
       border: 1px solid var(--border-color);
       border-radius: 16px;
       box-shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.05);
-      padding: 28px 24px;
+      padding: 24px 20px;
     }
 
     .form-label {
@@ -60,16 +60,17 @@
       padding: 10px 14px;
       font-size: 0.95rem;
       color: var(--text-main);
-      transition: all 0.2s ease;
     }
 
-    .form-select:focus, .form-control:focus {
-      border-color: var(--accent-color);
-      box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.1);
+    .form-control[readonly] {
+      background-color: var(--readonly-bg);
+      color: #334155;
+      font-weight: 600;
+      cursor: not-allowed;
     }
 
     .form-select:disabled {
-      background-color: #f1f5f9;
+      background-color: var(--readonly-bg);
       cursor: not-allowed;
       opacity: 0.7;
     }
@@ -95,7 +96,6 @@
       color: var(--text-muted);
       border-radius: 8px;
       cursor: pointer;
-      transition: all 0.2s ease;
       margin: 0;
     }
 
@@ -113,11 +113,6 @@
       font-weight: 600;
       font-size: 1rem;
       color: #ffffff;
-      transition: all 0.2s ease;
-    }
-
-    .btn-submit:hover {
-      background-color: var(--accent-hover);
     }
 
     .status-badge {
@@ -127,94 +122,59 @@
       border-radius: 20px;
     }
 
-    .status-online { background-color: var(--success-bg); color: var(--success-text); }
-    .status-offline { background-color: var(--warning-bg); color: var(--warning-text); }
+    .status-online { background-color: #dcfce7; color: #166534; }
+    .status-offline { background-color: #fef3c7; color: #92400e; }
 
-    /* GPS Box Styling */
-    .gps-container {
-      background: #f8fafc;
-      border: 1.5px dashed var(--border-color);
+    /* Read-Only Embedded Map Styling */
+    #mapContainer {
+      height: 190px;
       border-radius: 12px;
-      padding: 12px 16px;
+      border: 1.5px solid var(--border-color);
+      margin-bottom: 1rem;
+      z-index: 1;
+      overflow: hidden;
     }
 
-    .gps-container.locked {
-      background: #f0fdf4;
-      border-color: #86efac;
-    }
-
-    .gps-text {
-      font-size: 0.85rem;
-      font-weight: 600;
-      color: var(--text-main);
-    }
-
-    .gps-subtext {
-      font-size: 0.75rem;
-      color: var(--text-muted);
-    }
-
-    /* Modern Popup Modal */
+    /* Popup Modal Styling */
     .popup-backdrop {
       position: fixed;
-      top: 0;
-      left: 0;
-      width: 100vw;
-      height: 100vh;
+      top: 0; left: 0;
+      width: 100vw; height: 100vh;
       background: rgba(15, 23, 42, 0.6);
       backdrop-filter: blur(4px);
-      display: flex;
-      align-items: center;
-      justify-content: center;
+      display: flex; align-items: center; justify-content: center;
       z-index: 9999;
-      opacity: 0;
-      visibility: hidden;
+      opacity: 0; visibility: hidden;
       transition: all 0.25s ease;
       padding: 20px;
     }
 
-    .popup-backdrop.active {
-      opacity: 1;
-      visibility: visible;
-    }
+    .popup-backdrop.active { opacity: 1; visibility: visible; }
 
     .popup-card {
       background: #ffffff;
       border-radius: 20px;
-      max-width: 420px;
-      width: 100%;
+      max-width: 420px; width: 100%;
       padding: 24px;
+      text-align: center;
       box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2);
-      transform: scale(0.9);
-      transition: all 0.25s ease;
-    }
-
-    .popup-backdrop.active .popup-card {
-      transform: scale(1);
     }
 
     .popup-icon {
-      width: 48px;
-      height: 48px;
+      width: 48px; height: 48px;
       border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 24px;
-      font-weight: bold;
-      margin-bottom: 16px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 24px; font-weight: bold;
+      margin: 0 auto 16px auto;
     }
 
     .popup-error .popup-icon { background: #fee2e2; color: #dc2626; }
     .popup-success .popup-icon { background: #dcfce7; color: #166534; }
 
     .popup-btn {
-      border: none;
-      border-radius: 10px;
-      padding: 10px 18px;
-      font-weight: 600;
-      width: 100%;
-      margin-top: 16px;
+      border: none; border-radius: 10px;
+      padding: 10px 18px; font-weight: 600;
+      width: 100%; margin-top: 16px;
     }
 
     .popup-error .popup-btn { background: #dc2626; color: white; }
@@ -234,21 +194,28 @@
   <div class="card-custom">
     <div class="text-center mb-4">
       <h4 class="fw-bold m-0" style="color: var(--text-main);">Attendance Tracker</h4>
-      <p class="text-muted small m-0 mt-1">Cascading location & real GPS lock</p>
-    </div>
-
-    <!-- Live GPS Coordinates Box -->
-    <div id="gpsBox" class="gps-container mb-4">
-      <div class="d-flex align-items-center justify-content-between">
-        <div>
-          <div class="gps-text" id="gpsStatusText">📍 Acquiring Location...</div>
-          <div class="gps-subtext" id="gpsCoordinates">Tap 'Acquire GPS' if prompt appears</div>
-        </div>
-        <button type="button" class="btn btn-sm btn-outline-primary fw-bold" onclick="requestGPSCoordinates()">Acquire GPS</button>
-      </div>
+      <p class="text-muted small m-0 mt-1">Automatic GPS Map & Time Synchronization</p>
     </div>
 
     <form id="attendanceForm">
+
+      <!-- Automatic Read-Only Time Field -->
+      <div class="mb-3">
+        <label class="form-label">Current Date & Time <span class="text-muted fw-normal">(Auto)</span></label>
+        <input type="text" id="timeDisplay" class="form-control" readonly placeholder="Capturing time...">
+      </div>
+
+      <!-- Automatic Read-Only Location Field -->
+      <div class="mb-2">
+        <div class="d-flex justify-content-between align-items-center mb-1">
+          <label class="form-label m-0">Location Coordinates <span class="text-muted fw-normal">(Auto GPS)</span></label>
+          <button type="button" class="btn btn-sm btn-link p-0 text-decoration-none small" onclick="fetchGPSLocation()">Refresh Map</button>
+        </div>
+        <input type="text" id="locationDisplay" class="form-control" readonly placeholder="Acquiring GPS coordinates...">
+      </div>
+
+      <!-- Read-Only Leaflet Map -->
+      <div id="mapContainer"></div>
       
       <!-- 1. Project -->
       <div class="mb-3">
@@ -293,7 +260,7 @@
       <!-- 6. Full Name -->
       <div class="mb-3">
         <label class="form-label">Full Name <span class="text-danger">*</span></label>
-        <select id="fullName" class="form-select" onchange="onNameChange()" required disabled>
+        <select id="fullName" class="form-select" required disabled>
           <option value="">-- Select Designation First --</option>
         </select>
       </div>
@@ -323,94 +290,130 @@
 
 <!-- Modern Popup Modal -->
 <div id="popupModal" class="popup-backdrop popup-error">
-  <div class="popup-card text-center" tabindex="-1" id="popupCard">
-    <div id="popupIcon" class="popup-icon mx-auto">!</div>
+  <div class="popup-card" tabindex="-1" id="popupCard">
+    <div id="popupIcon" class="popup-icon">!</div>
     <h5 id="popupTitle" class="fw-bold mb-2">Attention Required</h5>
     <p id="popupMessage" class="text-muted small mb-0"></p>
-    <button type="button" class="popup-btn" id="popupCloseBtn" onclick="closePopup()">Acknowledge</button>
+    <button type="button" class="popup-btn" onclick="closePopup()">Acknowledge</button>
   </div>
 </div>
+
+<!-- Leaflet Map Library -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
 <script>
   // INSERT YOUR DEPLOYED GOOGLE APPS SCRIPT URL HERE
   const GAS_API_URL = "https://script.google.com/macros/s/AKfycbyLEMc5wnhuEbJXp7hP5Pmxhs4kKRU5LZABFqyd4ZnqJaWjJaVqUJhnqMFZPhXGUhFO-g/exec";
 
   let masterRoster = [];
-  let capturedLocation = null; // Stores object { lat, lng, formatted }
+  let map = null;
+  let mapMarker = null;
+  let capturedLat = null;
+  let capturedLng = null;
 
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('./sw.js').catch(err => console.log('SW registration error:', err));
+    navigator.serviceWorker.register('./sw.js').catch(err => console.log('SW Registration:', err));
   }
 
   window.addEventListener('load', () => {
     updateNetworkStatus();
-    requestGPSCoordinates();
+    initClock();
+    initLeafletMap();
+    fetchGPSLocation();
     loadRosterData();
   });
 
   window.addEventListener('online', updateNetworkStatus);
   window.addEventListener('offline', updateNetworkStatus);
 
-  // --- SMART GPS ENGINE WITH FALLBACK ---
-  function requestGPSCoordinates() {
-    const box = document.getElementById('gpsBox');
-    const statusText = document.getElementById('gpsStatusText');
-    const coordsText = document.getElementById('gpsCoordinates');
-
-    statusText.textContent = "📍 Requesting Location...";
-    coordsText.textContent = "Searching for satellites / cell signal...";
-    box.classList.remove('locked');
-
-    return new Promise((resolve) => {
-      if (!("geolocation" in navigator)) {
-        statusText.textContent = "⚠️ GPS Not Supported";
-        coordsText.textContent = "Browser does not support geolocation.";
-        capturedLocation = null;
-        resolve(null);
-        return;
-      }
-
-      // Try High Accuracy First
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          setGPSSuccess(pos);
-          resolve(capturedLocation);
-        },
-        (err) => {
-          // Fallback to Standard Accuracy (Cellular / Wi-Fi) if high accuracy times out
-          navigator.geolocation.getCurrentPosition(
-            (fallbackPos) => {
-              setGPSSuccess(fallbackPos);
-              resolve(capturedLocation);
-            },
-            (finalErr) => {
-              statusText.textContent = "⚠️ Location Access Denied / Failed";
-              coordsText.textContent = "Please allow Location permission in browser settings.";
-              capturedLocation = null;
-              resolve(null);
-            },
-            { enableHighAccuracy: false, timeout: 8000, maximumAge: 60000 }
-          );
-        },
-        { enableHighAccuracy: true, timeout: 6000, maximumAge: 10000 }
-      );
-    });
+  // --- AUTOMATIC READ-ONLY CLOCK ---
+  function initClock() {
+    updateClock();
+    setInterval(updateClock, 1000);
   }
 
-  function setGPSSuccess(pos) {
-    const lat = pos.coords.latitude.toFixed(6);
-    const lng = pos.coords.longitude.toFixed(6);
-    const formatted = `Lat: ${lat}, Long: ${lng}`;
+  function updateClock() {
+    const d = new Date();
+    const pad = n => String(n).padStart(2, '0');
+    const formatted = `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+    
+    const timeInput = document.getElementById('timeDisplay');
+    timeInput.value = formatted;
+  }
 
-    capturedLocation = { lat: lat, lng: lng, formatted: formatted };
+  // --- READ-ONLY LEAFLET MAP & GPS ENGINE ---
+  function initLeafletMap() {
+    // Initialize map centered at default coordinates
+    map = L.map('mapContainer', {
+      zoomControl: true,
+      dragging: true,
+      scrollWheelZoom: false
+    }).setView([20.0, 0.0], 2);
 
-    const box = document.getElementById('gpsBox');
-    const statusText = document.getElementById('gpsStatusText');
-    const coordsText = document.getElementById('gpsCoordinates');
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      attribution: '© OpenStreetMap'
+    }).addTo(map);
+  }
 
-    box.classList.add('locked');
-    statusText.textContent = "✓ GPS Location Locked";
-    coordsText.textContent = formatted;
+  function fetchGPSLocation() {
+    const locInput = document.getElementById('locationDisplay');
+    locInput.value = "Acquiring GPS coordinates...";
+
+    if (!("geolocation" in navigator)) {
+      locInput.value = "GPS Not Supported by browser";
+      return;
+    }
+
+    const options = {
+      enableHighAccuracy: true,
+      timeout: 10000,
+      maximumAge: 0
+    };
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        capturedLat = position.coords.latitude.toFixed(6);
+        capturedLng = position.coords.longitude.toFixed(6);
+        const locString = `Lat: ${capturedLat}, Long: ${capturedLng}`;
+
+        locInput.value = locString;
+
+        // Update Read-Only Map
+        const latLng = [parseFloat(capturedLat), parseFloat(capturedLng)];
+        map.setView(latLng, 16);
+
+        if (mapMarker) {
+          mapMarker.setLatLng(latLng);
+        } else {
+          mapMarker = L.marker(latLng).addTo(map);
+        }
+        mapMarker.bindPopup("<b>Your Current Location</b>").openPopup();
+      },
+      (error) => {
+        // Fallback: Standard Accuracy (Cellular/Wi-Fi)
+        navigator.geolocation.getCurrentPosition(
+          (fallbackPos) => {
+            capturedLat = fallbackPos.coords.latitude.toFixed(6);
+            capturedLng = fallbackPos.coords.longitude.toFixed(6);
+            const locString = `Lat: ${capturedLat}, Long: ${capturedLng}`;
+
+            locInput.value = locString;
+
+            const latLng = [parseFloat(capturedLat), parseFloat(capturedLng)];
+            map.setView(latLng, 15);
+            if (mapMarker) mapMarker.setLatLng(latLng);
+            else mapMarker = L.marker(latLng).addTo(map);
+          },
+          (err) => {
+            locInput.value = "GPS Access Denied / Unavailable";
+            showPopup("GPS Error", "Please allow Location permissions in your browser bar and tap 'Refresh Map'.", "error");
+          },
+          { enableHighAccuracy: false, timeout: 10000, maximumAge: 60000 }
+        );
+      },
+      options
+    );
   }
 
   function updateNetworkStatus() {
@@ -545,8 +548,6 @@
     document.getElementById('fullName').disabled = false;
   }
 
-  function onNameChange() {}
-
   function populateSelect(id, items, placeholder) {
     const el = document.getElementById(id);
     el.innerHTML = `<option value="">${placeholder}</option>` + items.map(i => `<option value="${i}">${i}</option>`).join('');
@@ -602,8 +603,16 @@
   }
 
   // --- FORM SUBMIT HANDLER ---
-  document.getElementById('attendanceForm').addEventListener('submit', async function(e) {
+  document.getElementById('attendanceForm').addEventListener('submit', function(e) {
     e.preventDefault();
+
+    const timeVal = document.getElementById('timeDisplay').value;
+    const locVal = document.getElementById('locationDisplay').value;
+
+    if (!locVal || locVal.includes("Acquiring") || locVal.includes("Denied") || locVal.includes("Unavailable")) {
+      showPopup("GPS Required", "Valid GPS coordinates are required. Please enable Location services and tap 'Refresh Map'.", "error");
+      return;
+    }
 
     const proj = document.getElementById('project').value;
     const org = document.getElementById('organization').value;
@@ -619,22 +628,9 @@
       return;
     }
 
-    // Force GPS lock attempt if not acquired yet
-    if (!capturedLocation) {
-      await requestGPSCoordinates();
-    }
+    const todayStr = timeVal.split(' ')[0];
 
-    if (!capturedLocation) {
-      showPopup("GPS Required", "Could not capture your GPS coordinates. Please enable Location/GPS on your device and tap 'Acquire GPS'.", "error");
-      return;
-    }
-
-    const d = new Date();
-    const pad = n => String(n).padStart(2, '0');
-    const todayStr = `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`;
-    const timestamp = `${todayStr} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
-
-    // Client-side same-day rules check
+    // Check same-day attendance rules
     const check = validateSameDayFlow(name, type, todayStr);
     if (!check.valid) {
       showPopup("Validation Error", check.msg, "error");
@@ -651,8 +647,8 @@
       designation: desig,
       fullName: name,
       type: type,
-      time: timestamp,
-      location: capturedLocation.formatted,
+      time: timeVal,
+      location: locVal,
       remarks: remarks
     };
 
@@ -681,7 +677,7 @@
 
       if (res.status === 'SUCCESS') {
         cacheSubmittedRecord(record);
-        showPopup("Success", `${record.type} recorded for ${record.fullName} with GPS coordinates!`, "success");
+        showPopup("Success", `${record.type} recorded for ${record.fullName}!`, "success");
         resetForm();
       } else if (res.status === 'VALIDATION_FAILED') {
         showPopup("Submission Denied", res.message, "error");
@@ -739,9 +735,10 @@
     document.getElementById('attendanceForm').reset();
     document.getElementById('typeIn').checked = true;
     initProjectDropdown();
+    fetchGPSLocation();
   }
 
-  // --- POPUP DIALOG CONTROLS ---
+  // --- POPUP MODAL CONTROLS ---
   function showPopup(title, message, type = "error") {
     const modal = document.getElementById('popupModal');
     const card = document.getElementById('popupCard');

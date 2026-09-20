@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Attendance App</title>
+  <link rel="manifest" href="manifest.json">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <meta name="theme-color" content="#0d6efd">
+  <style>
+    body { background-color: #f4f6f9; padding-top: 15px; padding-bottom: 30px; }
+    .card { border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
+    .badge-offline { background-color: #ffc107; color: #000; }
+    .badge-online { background-color: #198754; color: #fff; }
+  </style>
+</head>
+<body>
+
+<div class="container" style="max-width: 600px;">
+  <div class="d-flex justify-content-between align-items-center mb-2 px-1">
+    <span id="networkStatusBadge" class="badge badge-online">● Online</span>
+    <span id="pendingQueueBadge" class="badge bg-secondary d-none">0 Pending Sync</span>
+  </div>
+
+  <div class="card p-4">
+    <h4 class="fw-bold mb-3 text-primary text-center">Employee Attendance</h4>
+
+    <form id="attendanceForm">
+      <div class="mb-3">
+        <label class="form-label fw-bold">Select Employee Name</label>
+        <select id="fullName" class="form-select" onchange="onEmployeeSelect()" required>
+          <option value="">-- Loading Employees... --</option>
+        </select>
+      </div>
+
+      <div class="row g-2 mb-3">
+        <div class="col-6">
+          <label class="form-label fw-bold">Project</label>
+          <select id="project" class="form-select" required><option value="">-- Select --</option></select>
+        </div>
+        <div class="col-6">
+          <label class="form-label fw-bold">Organization</label>
+          <select id="organization" class="form-select" required><option value="">-- Select --</option></select>
+        </div>
+      </div>
+
+      <div class="row g-2 mb-3">
+        <div class="col-6">
+          <label class="form-label fw-bold">District</label>
+          <select id="district" class="form-select" required><option value="">-- Select --</option></select>
+        </div>
+        <div class="col-6">
+          <label class="form-label fw-bold">Union Council</label>
+          <select id="unionCouncil" class="form-select" required><option value="">-- Select --</option></select>
+        </div>
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label fw-bold">Designation</label>
+        <select id="designation" class="form-select" required><option value="">-- Select --</option></select>
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label fw-bold d-block">Attendance Type</label>
+        <div class="form-check form-check-inline">
+          <input class="form-check-input" type="radio" name="type" id="typeIn" value="Check-In" checked>
+          <label class="form-check-label" for="typeIn">Check-In</label>
+        </div>
+        <div class="form-check form-check-inline">
+          <input class="form-check-input" type="radio" name="type" id="typeOut" value="Check-Out">
+          <label class="form-check-label" for="typeOut">Check-Out</label>
+        </div>
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label fw-bold">Remarks</label>
+        <textarea id="remarks" class="form-control" rows="2" placeholder="Optional remarks..."></textarea>
+      </div>
+
+      <button type="submit" id="submitBtn" class="btn btn-primary w-100 fw-bold">Submit Attendance</button>
+    </form>
+  </div>
+</div>
+
+<script>
+  // Insert your Web App URL here
+  const GAS_API_URL = "https://script.google.com/macros/s/AKfycbyLEMc5wnhuEbJXp7hP5Pmxhs4kKRU5LZABFqyd4ZnqJaWjJaVqUJhnqMFZPhXGUhFO-g/exec";
+
+  let employeeRosterCache = [];
+
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('./sw.js').catch(err => console.log('SW Registration failed:', err));
+  }
+
+  window.addEventListener('load', () => {
+    updateNetworkStatus();
+    fetchAndPopulateDropdowns();
+  });
+
+  window.addEventListener('online', updateNetworkStatus);
+  window.addEventListener('offline', updateNetworkStatus);
+
+  function updateNetworkStatus() {
+    const badge = document.getElementById('networkStatusBadge');
+    if (navigator.onLine) {
+      badge.className = "badge badge-online";
+      badge.textContent = "● Online";
+      syncOfflineQueue();
+    } else {
+      badge.className = "badge badge-offline";
+      badge.textContent = "● Offline Mode";
+    }
+    updateQueueBadge();
+  }
+
+  function updateQueueBadge() {
+    const queue = JSON.parse(localStorage.getItem('offline_attendance_queue') || '[]');
+    const badge = document.getElementById('pendingQueueBadge');
+    if (queue.length > 0) {
+      badge.textContent = `${queue.length} Pending Sync`;
+      badge.classList.remove('d-none');
+    } else {
+      badge.classList.add('d-none');
+    }
+  }
+
+  function fetchAndPopulateDropdowns() {
+    if (navigator.onLine) {
+      fetch(GAS_API_URL, {
+        method: 'POST',
+        body: JSON.stringify({ action: 'getEmployees' })
+      })
+      .then(res => res.json())
+      .then(res => {
+        if (res.status === 'SUCCESS') {
+          localStorage.setItem('employee_dropdown_cache', JSON.stringify(res));
+          populateDropdownFields(res);
+        } else {
+          loadDropdownsFromCache();
+        }
+      })
+      .catch(() => loadDropdownsFromCache());
+    } else {
+      loadDropdownsFromCache();
+    }
+  }
+
+  function loadDropdownsFromCache() {
+    const cachedData = localStorage.getItem('employee_dropdown_cache');
+    if (cachedData) {
+      populateDropdownFields(JSON.parse(cachedData));
+    } else {
+      document.getElementById('fullName').innerHTML = '<option value="">-- Offline (No Cache) --</option>';
+    }
+  }
+
+  function populateDropdownFields(data) {
+    employeeRosterCache = data.employees || [];
+    const nameSelect = document.getElementById('fullName');
+    nameSelect.innerHTML = '<option value="">-- Select Employee --</option>' +
+      employeeRosterCache.map(emp => `<option value="${emp.fullName}">${emp.fullName}</option>`).join('');
+
+    fillSelectOptions('project', data.projects);
+    fillSelectOptions('organization', data.organizations);
+    fillSelectOptions('district', data.districts);
+    fillSelectOptions('unionCouncil', data.unionCouncils);
+    fillSelectOptions('designation', data.designations);
+  }
+
+  function fillSelectOptions(id, options) {
+    const select = document.getElementById(id);
+    if (!select || !options) return;
+    select.innerHTML = '<option value="">-- Select --</option>' + options.map(o => `<option value="${o}">${o}</option>`).join('');
+  }
+
+  function onEmployeeSelect() {
+    const selectedName = document.getElementById('fullName').value;
+    const match = employeeRosterCache.find(emp => emp.fullName === selectedName);
+    if (match) {
+      document.getElementById('project').value = match.project;
+      document.getElementById('organization').value = match.organization;
+      document.getElementById('district').value = match.district;
+      document.getElementById('unionCouncil').value = match.unionCouncil;
+      document.getElementById('designation').value = match.designation;
+    }
+  }
+
+  document.getElementById('attendanceForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    const d = new Date();
+    const pad = n => String(n).padStart(2, '0');
+    const timestamp = `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+
+    const record = {
+      uid: 'UID-' + Date.now(),
+      email: 'pwa-user@app.local',
+      project: document.getElementById('project').value,
+      organization: document.getElementById('organization').value,
+      district: document.getElementById('district').value,
+      unionCouncil: document.getElementById('unionCouncil').value,
+      fullName: document.getElementById('fullName').value,
+      designation: document.getElementById('designation').value,
+      type: document.querySelector('input[name="type"]:checked').value,
+      time: timestamp,
+      remarks: document.getElementById('remarks').value
+    };
+
+    if (navigator.onLine) {
+      sendToServer(record);
+    } else {
+      saveLocally(record);
+      alert('[OFFLINE MODE] Saved locally. Will auto-sync when online.');
+      document.getElementById('attendanceForm').reset();
+    }
+  });
+
+  function sendToServer(record) {
+    fetch(GAS_API_URL, {
+      method: 'POST',
+      body: JSON.stringify({ action: 'submitAttendance', record: record })
+    })
+    .then(res => res.json())
+    .then(res => {
+      if (res.status === 'SUCCESS') {
+        alert('Attendance recorded successfully!');
+        document.getElementById('attendanceForm').reset();
+      } else {
+        saveLocally(record);
+        alert(res.message || 'Saved to offline queue.');
+      }
+    })
+    .catch(() => {
+      saveLocally(record);
+      alert('Network interrupted: Saved to offline queue.');
+    });
+  }
+
+  function saveLocally(record) {
+    let queue = JSON.parse(localStorage.getItem('offline_attendance_queue') || '[]');
+    queue.push(record);
+    localStorage.setItem('offline_attendance_queue', JSON.stringify(queue));
+    updateQueueBadge();
+  }
+
+  function syncOfflineQueue() {
+    let queue = JSON.parse(localStorage.getItem('offline_attendance_queue') || '[]');
+    if (queue.length === 0) return;
+
+    let completed = 0;
+    queue.forEach(record => {
+      fetch(GAS_API_URL, {
+        method: 'POST',
+        body: JSON.stringify({ action: 'submitAttendance', record: record })
+      })
+      .then(() => {
+        completed++;
+        if (completed === queue.length) {
+          localStorage.setItem('offline_attendance_queue', JSON.stringify([]));
+          updateQueueBadge();
+          alert('All offline records synced!');
+        }
+      });
+    });
+  }
+</script>
+</body>
+</html>

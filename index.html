@@ -3,119 +3,259 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Attendance App</title>
+  <title>Attendance Tracker</title>
   <link rel="manifest" href="manifest.json">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-  <meta name="theme-color" content="#0d6efd">
+  <meta name="theme-color" content="#2563eb">
+
   <style>
-    body { background-color: #f4f6f9; padding-top: 15px; padding-bottom: 30px; }
-    .card { border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
-    .badge-offline { background-color: #ffc107; color: #000; }
-    .badge-online { background-color: #198754; color: #fff; }
+    :root {
+      --bg-surface: #0f172a;
+      --card-bg: #ffffff;
+      --text-main: #1e293b;
+      --text-muted: #64748b;
+      --accent-color: #2563eb;
+      --accent-hover: #1d4ed8;
+      --border-color: #e2e8f0;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background-color: #f8fafc;
+      color: var(--text-main);
+      padding-top: 20px;
+      padding-bottom: 40px;
+    }
+
+    .app-container {
+      max-width: 520px;
+      margin: 0 auto;
+    }
+
+    .card-custom {
+      background: var(--card-bg);
+      border: 1px solid var(--border-color);
+      border-radius: 16px;
+      box-shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.05);
+      padding: 28px 24px;
+    }
+
+    .form-label {
+      font-weight: 600;
+      font-size: 0.85rem;
+      color: var(--text-main);
+      margin-bottom: 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+    }
+
+    .form-select, .form-control {
+      border-radius: 10px;
+      border: 1.5px solid var(--border-color);
+      padding: 10px 14px;
+      font-size: 0.95rem;
+      color: var(--text-main);
+      transition: all 0.2s ease;
+    }
+
+    .form-select:focus, .form-control:focus {
+      border-color: var(--accent-color);
+      box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.1);
+    }
+
+    .form-select:disabled {
+      background-color: #f1f5f9;
+      cursor: not-allowed;
+      opacity: 0.7;
+    }
+
+    /* Segmented Control for Check-In / Check-Out */
+    .segmented-control {
+      display: flex;
+      background-color: #f1f5f9;
+      padding: 4px;
+      border-radius: 12px;
+      border: 1px solid var(--border-color);
+    }
+
+    .segmented-control input[type="radio"] {
+      display: none;
+    }
+
+    .segmented-control label {
+      flex: 1;
+      text-align: center;
+      padding: 10px 12px;
+      font-weight: 600;
+      font-size: 0.9rem;
+      color: var(--text-muted);
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      margin: 0;
+    }
+
+    .segmented-control input[type="radio"]:checked + label {
+      background-color: var(--accent-color);
+      color: #ffffff;
+      box-shadow: 0 2px 8px rgba(37, 99, 235, 0.25);
+    }
+
+    .btn-submit {
+      background-color: var(--accent-color);
+      border: none;
+      border-radius: 10px;
+      padding: 12px;
+      font-weight: 600;
+      font-size: 1rem;
+      color: #ffffff;
+      transition: all 0.2s ease;
+    }
+
+    .btn-submit:hover {
+      background-color: var(--accent-hover);
+      transform: translateY(-1px);
+    }
+
+    .status-badge {
+      font-size: 0.75rem;
+      font-weight: 600;
+      padding: 6px 12px;
+      border-radius: 20px;
+    }
+
+    .status-online { background-color: #dcfce7; color: #166534; }
+    .status-offline { background-color: #fef3c7; color: #92400e; }
   </style>
 </head>
 <body>
 
-<div class="container" style="max-width: 600px;">
-  <div class="d-flex justify-content-between align-items-center mb-2 px-1">
-    <span id="networkStatusBadge" class="badge badge-online">● Online</span>
-    <span id="pendingQueueBadge" class="badge bg-secondary d-none">0 Pending Sync</span>
+<div class="container app-container">
+
+  <!-- Status Bar Header -->
+  <div class="d-flex justify-content-between align-items-center mb-3 px-1">
+    <span id="networkStatus" class="status-badge status-online">● Online</span>
+    <span id="queueStatus" class="badge bg-secondary rounded-pill d-none">0 Pending Sync</span>
   </div>
 
-  <div class="card p-4">
-    <h4 class="fw-bold mb-3 text-primary text-center">Employee Attendance</h4>
+  <div class="card-custom">
+    <div class="text-center mb-4">
+      <h4 class="fw-bold m-0" style="color: var(--text-main);">Attendance Form</h4>
+      <p class="text-muted small m-0 mt-1">Cascading location & employee selection</p>
+    </div>
+
+    <!-- Alert Box for Validation / Messages -->
+    <div id="alertBox" class="alert alert-danger small d-none" role="alert"></div>
 
     <form id="attendanceForm">
+      
+      <!-- 1. Project -->
       <div class="mb-3">
-        <label class="form-label fw-bold">Select Employee Name</label>
-        <select id="fullName" class="form-select" onchange="onEmployeeSelect()" required>
-          <option value="">-- Loading Employees... --</option>
+        <label class="form-label">Project <span class="text-danger">*</span></label>
+        <select id="project" class="form-select" onchange="onProjectChange()" required>
+          <option value="">-- Select Project --</option>
         </select>
       </div>
 
-      <div class="row g-2 mb-3">
-        <div class="col-6">
-          <label class="form-label fw-bold">Project</label>
-          <select id="project" class="form-select" required><option value="">-- Select --</option></select>
-        </div>
-        <div class="col-6">
-          <label class="form-label fw-bold">Organization</label>
-          <select id="organization" class="form-select" required><option value="">-- Select --</option></select>
-        </div>
-      </div>
-
-      <div class="row g-2 mb-3">
-        <div class="col-6">
-          <label class="form-label fw-bold">District</label>
-          <select id="district" class="form-select" required><option value="">-- Select --</option></select>
-        </div>
-        <div class="col-6">
-          <label class="form-label fw-bold">Union Council</label>
-          <select id="unionCouncil" class="form-select" required><option value="">-- Select --</option></select>
-        </div>
-      </div>
-
+      <!-- 2. Organization -->
       <div class="mb-3">
-        <label class="form-label fw-bold">Designation</label>
-        <select id="designation" class="form-select" required><option value="">-- Select --</option></select>
+        <label class="form-label">Organization <span class="text-danger">*</span></label>
+        <select id="organization" class="form-select" onchange="onOrganizationChange()" required disabled>
+          <option value="">-- Select Project First --</option>
+        </select>
       </div>
 
+      <!-- 3. District -->
       <div class="mb-3">
-        <label class="form-label fw-bold d-block">Attendance Type</label>
-        <div class="form-check form-check-inline">
-          <input class="form-check-input" type="radio" name="type" id="typeIn" value="Check-In" checked>
-          <label class="form-check-label" for="typeIn">Check-In</label>
-        </div>
-        <div class="form-check form-check-inline">
-          <input class="form-check-input" type="radio" name="type" id="typeOut" value="Check-Out">
-          <label class="form-check-label" for="typeOut">Check-Out</label>
-        </div>
+        <label class="form-label">District <span class="text-danger">*</span></label>
+        <select id="district" class="form-select" onchange="onDistrictChange()" required disabled>
+          <option value="">-- Select Organization First --</option>
+        </select>
       </div>
 
+      <!-- 4. Union Council -->
       <div class="mb-3">
-        <label class="form-label fw-bold">Remarks</label>
-        <textarea id="remarks" class="form-control" rows="2" placeholder="Optional remarks..."></textarea>
+        <label class="form-label">Union Council <span class="text-danger">*</span></label>
+        <select id="unionCouncil" class="form-select" onchange="onUnionCouncilChange()" required disabled>
+          <option value="">-- Select District First --</option>
+        </select>
       </div>
 
-      <button type="submit" id="submitBtn" class="btn btn-primary w-100 fw-bold">Submit Attendance</button>
+      <!-- 5. Designation -->
+      <div class="mb-3">
+        <label class="form-label">Designation <span class="text-danger">*</span></label>
+        <select id="designation" class="form-select" onchange="onDesignationChange()" required disabled>
+          <option value="">-- Select Union Council First --</option>
+        </select>
+      </div>
+
+      <!-- 6. Full Name -->
+      <div class="mb-3">
+        <label class="form-label">Full Name <span class="text-danger">*</span></label>
+        <select id="fullName" class="form-select" onchange="onNameChange()" required disabled>
+          <option value="">-- Select Designation First --</option>
+        </select>
+      </div>
+
+      <!-- 7. Attendance Type Segmented Toggle -->
+      <div class="mb-3">
+        <label class="form-label d-block">Attendance Type <span class="text-danger">*</span></label>
+        <div class="segmented-control">
+          <input type="radio" name="type" id="typeIn" value="Check-In" checked>
+          <label for="typeIn">Check-In</label>
+          
+          <input type="radio" name="type" id="typeOut" value="Check-Out">
+          <label for="typeOut">Check-Out</label>
+        </div>
+      </div>
+
+      <!-- 8. Remarks (Optional) -->
+      <div class="mb-4">
+        <label class="form-label">Remarks <span class="text-muted fw-normal">(Optional)</span></label>
+        <textarea id="remarks" class="form-control" rows="2" placeholder="Write any optional notes..."></textarea>
+      </div>
+
+      <button type="submit" id="submitBtn" class="btn btn-submit w-100">Submit Attendance</button>
     </form>
   </div>
 </div>
 
 <script>
-  // Insert your Web App URL here
+  // INSERT YOUR DEPLOYED GOOGLE APPS SCRIPT URL HERE
   const GAS_API_URL = "https://script.google.com/macros/s/AKfycbyLEMc5wnhuEbJXp7hP5Pmxhs4kKRU5LZABFqyd4ZnqJaWjJaVqUJhnqMFZPhXGUhFO-g/exec";
 
-  let employeeRosterCache = [];
+  let masterRoster = [];
 
+  // Register Service Worker for offline launch
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('./sw.js').catch(err => console.log('SW Registration failed:', err));
+    navigator.serviceWorker.register('./sw.js').catch(err => console.log('SW failed:', err));
   }
 
   window.addEventListener('load', () => {
     updateNetworkStatus();
-    fetchAndPopulateDropdowns();
+    loadRosterData();
   });
 
   window.addEventListener('online', updateNetworkStatus);
   window.addEventListener('offline', updateNetworkStatus);
 
   function updateNetworkStatus() {
-    const badge = document.getElementById('networkStatusBadge');
+    const statusEl = document.getElementById('networkStatus');
     if (navigator.onLine) {
-      badge.className = "badge badge-online";
-      badge.textContent = "● Online";
+      statusEl.className = "status-badge status-online";
+      statusEl.textContent = "● Online";
       syncOfflineQueue();
     } else {
-      badge.className = "badge badge-offline";
-      badge.textContent = "● Offline Mode";
+      statusEl.className = "status-badge status-offline";
+      statusEl.textContent = "● Offline Mode";
     }
     updateQueueBadge();
   }
 
   function updateQueueBadge() {
     const queue = JSON.parse(localStorage.getItem('offline_attendance_queue') || '[]');
-    const badge = document.getElementById('pendingQueueBadge');
+    const badge = document.getElementById('queueStatus');
     if (queue.length > 0) {
       badge.textContent = `${queue.length} Pending Sync`;
       badge.classList.remove('d-none');
@@ -124,7 +264,9 @@
     }
   }
 
-  function fetchAndPopulateDropdowns() {
+  // --- DYNAMIC CASCADING DROPDOWN LOGIC ---
+
+  function loadRosterData() {
     if (navigator.onLine) {
       fetch(GAS_API_URL, {
         method: 'POST',
@@ -132,77 +274,181 @@
       })
       .then(res => res.json())
       .then(res => {
-        if (res.status === 'SUCCESS') {
-          localStorage.setItem('employee_dropdown_cache', JSON.stringify(res));
-          populateDropdownFields(res);
+        if (res.status === 'SUCCESS' && res.employees) {
+          masterRoster = res.employees;
+          localStorage.setItem('employee_roster_cache', JSON.stringify(masterRoster));
+          initProjectDropdown();
         } else {
-          loadDropdownsFromCache();
+          loadRosterFromCache();
         }
       })
-      .catch(() => loadDropdownsFromCache());
+      .catch(() => loadRosterFromCache());
     } else {
-      loadDropdownsFromCache();
+      loadRosterFromCache();
     }
   }
 
-  function loadDropdownsFromCache() {
-    const cachedData = localStorage.getItem('employee_dropdown_cache');
-    if (cachedData) {
-      populateDropdownFields(JSON.parse(cachedData));
+  function loadRosterFromCache() {
+    const cache = localStorage.getItem('employee_roster_cache');
+    if (cache) {
+      masterRoster = JSON.parse(cache);
+      initProjectDropdown();
     } else {
-      document.getElementById('fullName').innerHTML = '<option value="">-- Offline (No Cache) --</option>';
+      showAlert("No offline employee cache found. Please connect to internet once.");
     }
   }
 
-  function populateDropdownFields(data) {
-    employeeRosterCache = data.employees || [];
-    const nameSelect = document.getElementById('fullName');
-    nameSelect.innerHTML = '<option value="">-- Select Employee --</option>' +
-      employeeRosterCache.map(emp => `<option value="${emp.fullName}">${emp.fullName}</option>`).join('');
-
-    fillSelectOptions('project', data.projects);
-    fillSelectOptions('organization', data.organizations);
-    fillSelectOptions('district', data.districts);
-    fillSelectOptions('unionCouncil', data.unionCouncils);
-    fillSelectOptions('designation', data.designations);
+  function initProjectDropdown() {
+    const projects = [...new Set(masterRoster.map(e => e.project))].filter(Boolean);
+    populateSelect('project', projects, '-- Select Project --');
+    resetDownstream('project');
   }
 
-  function fillSelectOptions(id, options) {
-    const select = document.getElementById(id);
-    if (!select || !options) return;
-    select.innerHTML = '<option value="">-- Select --</option>' + options.map(o => `<option value="${o}">${o}</option>`).join('');
+  function onProjectChange() {
+    const selectedProject = document.getElementById('project').value;
+    if (!selectedProject) { resetDownstream('project'); return; }
+
+    const filtered = masterRoster.filter(e => e.project === selectedProject);
+    const orgs = [...new Set(filtered.map(e => e.organization))].filter(Boolean);
+    
+    populateSelect('organization', orgs, '-- Select Organization --');
+    document.getElementById('organization').disabled = false;
+    resetDownstream('organization');
   }
 
-  function onEmployeeSelect() {
-    const selectedName = document.getElementById('fullName').value;
-    const match = employeeRosterCache.find(emp => emp.fullName === selectedName);
-    if (match) {
-      document.getElementById('project').value = match.project;
-      document.getElementById('organization').value = match.organization;
-      document.getElementById('district').value = match.district;
-      document.getElementById('unionCouncil').value = match.unionCouncil;
-      document.getElementById('designation').value = match.designation;
+  function onOrganizationChange() {
+    const proj = document.getElementById('project').value;
+    const org = document.getElementById('organization').value;
+    if (!org) { resetDownstream('organization'); return; }
+
+    const filtered = masterRoster.filter(e => e.project === proj && e.organization === org);
+    const districts = [...new Set(filtered.map(e => e.district))].filter(Boolean);
+
+    populateSelect('district', districts, '-- Select District --');
+    document.getElementById('district').disabled = false;
+    resetDownstream('district');
+  }
+
+  function onDistrictChange() {
+    const proj = document.getElementById('project').value;
+    const org = document.getElementById('organization').value;
+    const dist = document.getElementById('district').value;
+    if (!dist) { resetDownstream('district'); return; }
+
+    const filtered = masterRoster.filter(e => e.project === proj && e.organization === org && e.district === dist);
+    const ucs = [...new Set(filtered.map(e => e.unionCouncil))].filter(Boolean);
+
+    populateSelect('unionCouncil', ucs, '-- Select Union Council --');
+    document.getElementById('unionCouncil').disabled = false;
+    resetDownstream('unionCouncil');
+  }
+
+  function onUnionCouncilChange() {
+    const proj = document.getElementById('project').value;
+    const org = document.getElementById('organization').value;
+    const dist = document.getElementById('district').value;
+    const uc = document.getElementById('unionCouncil').value;
+    if (!uc) { resetDownstream('unionCouncil'); return; }
+
+    const filtered = masterRoster.filter(e => e.project === proj && e.organization === org && e.district === dist && e.unionCouncil === uc);
+    const designations = [...new Set(filtered.map(e => e.designation))].filter(Boolean);
+
+    populateSelect('designation', designations, '-- Select Designation --');
+    document.getElementById('designation').disabled = false;
+    resetDownstream('designation');
+  }
+
+  function onDesignationChange() {
+    const proj = document.getElementById('project').value;
+    const org = document.getElementById('organization').value;
+    const dist = document.getElementById('district').value;
+    const uc = document.getElementById('unionCouncil').value;
+    const desig = document.getElementById('designation').value;
+    if (!desig) { resetDownstream('designation'); return; }
+
+    const filtered = masterRoster.filter(e => 
+      e.project === proj && 
+      e.organization === org && 
+      e.district === dist && 
+      e.unionCouncil === uc && 
+      e.designation === desig
+    );
+    const names = [...new Set(filtered.map(e => e.fullName))].filter(Boolean);
+
+    populateSelect('fullName', names, '-- Select Full Name --');
+    document.getElementById('fullName').disabled = false;
+  }
+
+  function onNameChange() {
+    hideAlert();
+  }
+
+  function populateSelect(elementId, items, placeholder) {
+    const select = document.getElementById(elementId);
+    select.innerHTML = `<option value="">${placeholder}</option>` + 
+      items.map(item => `<option value="${item}">${item}</option>`).join('');
+  }
+
+  function resetDownstream(level) {
+    const sequence = ['project', 'organization', 'district', 'unionCouncil', 'designation', 'fullName'];
+    const startIndex = sequence.indexOf(level) + 1;
+
+    for (let i = startIndex; i < sequence.length; i++) {
+      const field = document.getElementById(sequence[i]);
+      field.innerHTML = `<option value="">-- Select ${formatLabel(sequence[i - 1])} First --</option>`;
+      field.disabled = true;
+      field.value = "";
     }
   }
+
+  function formatLabel(str) {
+    return str.replace(/([A-Z])/g, ' $1').replace(/^./, s => s.toUpperCase());
+  }
+
+  // --- FORM SUBMISSION & DOUBLE CHECK-IN VALIDATION ---
 
   document.getElementById('attendanceForm').addEventListener('submit', function(e) {
     e.preventDefault();
+    hideAlert();
+
+    const proj = document.getElementById('project').value;
+    const org = document.getElementById('organization').value;
+    const dist = document.getElementById('district').value;
+    const uc = document.getElementById('unionCouncil').value;
+    const desig = document.getElementById('designation').value;
+    const name = document.getElementById('fullName').value;
+    const type = document.querySelector('input[name="type"]:checked').value;
+    const remarks = document.getElementById('remarks').value;
+
+    // 1. Mandatory Field Check
+    if (!proj || !org || !dist || !uc || !desig || !name) {
+      showAlert("All fields are required except remarks.");
+      return;
+    }
+
     const d = new Date();
     const pad = n => String(n).padStart(2, '0');
     const timestamp = `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+    const todayDateStr = `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`;
+
+    // 2. Client-Side Double Check-In Validation
+    if (type === 'Check-In' && isDoubleCheckInLocally(name, todayDateStr)) {
+      showAlert(`Validation Error: ${name} has already checked in today (${todayDateStr}).`);
+      return;
+    }
 
     const record = {
       uid: 'UID-' + Date.now(),
       email: 'pwa-user@app.local',
-      project: document.getElementById('project').value,
-      organization: document.getElementById('organization').value,
-      district: document.getElementById('district').value,
-      unionCouncil: document.getElementById('unionCouncil').value,
-      fullName: document.getElementById('fullName').value,
-      designation: document.getElementById('designation').value,
-      type: document.querySelector('input[name="type"]:checked').value,
+      project: proj,
+      organization: org,
+      district: dist,
+      unionCouncil: uc,
+      designation: desig,
+      fullName: name,
+      type: type,
       time: timestamp,
-      remarks: document.getElementById('remarks').value
+      remarks: remarks
     };
 
     if (navigator.onLine) {
@@ -210,28 +456,54 @@
     } else {
       saveLocally(record);
       alert('[OFFLINE MODE] Saved locally. Will auto-sync when online.');
-      document.getElementById('attendanceForm').reset();
+      resetForm();
     }
   });
 
+  function isDoubleCheckInLocally(name, dateStr) {
+    const queue = JSON.parse(localStorage.getItem('offline_attendance_queue') || '[]');
+    const history = JSON.parse(localStorage.getItem('submitted_attendance_logs') || '[]');
+    const combined = [...queue, ...history];
+
+    return combined.some(r => 
+      r.fullName.toLowerCase() === name.toLowerCase() && 
+      r.type === 'Check-In' && 
+      r.time.startsWith(dateStr)
+    );
+  }
+
   function sendToServer(record) {
+    const btn = document.getElementById('submitBtn');
+    btn.disabled = true;
+    btn.textContent = "Submitting...";
+
     fetch(GAS_API_URL, {
       method: 'POST',
       body: JSON.stringify({ action: 'submitAttendance', record: record })
     })
     .then(res => res.json())
     .then(res => {
+      btn.disabled = false;
+      btn.textContent = "Submit Attendance";
+
       if (res.status === 'SUCCESS') {
-        alert('Attendance recorded successfully!');
-        document.getElementById('attendanceForm').reset();
+        cacheSubmittedRecord(record);
+        alert("Attendance submitted successfully!");
+        resetForm();
+      } else if (res.status === 'VALIDATION_FAILED') {
+        showAlert(res.message);
       } else {
         saveLocally(record);
-        alert(res.message || 'Saved to offline queue.');
+        alert("Server issue: Saved to local offline queue.");
+        resetForm();
       }
     })
     .catch(() => {
+      btn.disabled = false;
+      btn.textContent = "Submit Attendance";
       saveLocally(record);
-      alert('Network interrupted: Saved to offline queue.');
+      alert("Network interrupted: Saved to offline queue.");
+      resetForm();
     });
   }
 
@@ -239,7 +511,14 @@
     let queue = JSON.parse(localStorage.getItem('offline_attendance_queue') || '[]');
     queue.push(record);
     localStorage.setItem('offline_attendance_queue', JSON.stringify(queue));
+    cacheSubmittedRecord(record);
     updateQueueBadge();
+  }
+
+  function cacheSubmittedRecord(record) {
+    let logs = JSON.parse(localStorage.getItem('submitted_attendance_logs') || '[]');
+    logs.push(record);
+    localStorage.setItem('submitted_attendance_logs', JSON.stringify(logs));
   }
 
   function syncOfflineQueue() {
@@ -257,10 +536,27 @@
         if (completed === queue.length) {
           localStorage.setItem('offline_attendance_queue', JSON.stringify([]));
           updateQueueBadge();
-          alert('All offline records synced!');
+          alert("All offline attendance records synced!");
         }
       });
     });
+  }
+
+  function resetForm() {
+    document.getElementById('attendanceForm').reset();
+    document.getElementById('typeIn').checked = true;
+    initProjectDropdown();
+    hideAlert();
+  }
+
+  function showAlert(msg) {
+    const alertBox = document.getElementById('alertBox');
+    alertBox.textContent = msg;
+    alertBox.classList.remove('d-none');
+  }
+
+  function hideAlert() {
+    document.getElementById('alertBox').classList.add('d-none');
   }
 </script>
 </body>

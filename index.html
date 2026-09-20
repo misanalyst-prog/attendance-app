@@ -18,6 +18,7 @@
       --accent-color: #2563eb;
       --accent-hover: #1d4ed8;
       --border-color: #e2e8f0;
+      --danger-color: #ef4444;
     }
 
     body {
@@ -43,7 +44,7 @@
 
     .form-label {
       font-weight: 600;
-      font-size: 0.85rem;
+      font-size: 0.82rem;
       color: var(--text-main);
       margin-bottom: 6px;
       text-transform: uppercase;
@@ -70,7 +71,6 @@
       opacity: 0.7;
     }
 
-    /* Segmented Control for Check-In / Check-Out */
     .segmented-control {
       display: flex;
       background-color: #f1f5f9;
@@ -115,7 +115,6 @@
 
     .btn-submit:hover {
       background-color: var(--accent-hover);
-      transform: translateY(-1px);
     }
 
     .status-badge {
@@ -127,6 +126,81 @@
 
     .status-online { background-color: #dcfce7; color: #166534; }
     .status-offline { background-color: #fef3c7; color: #92400e; }
+
+    .location-box {
+      font-size: 0.8rem;
+      background: #f1f5f9;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 8px 12px;
+      color: var(--text-muted);
+    }
+
+    /* Modern Glassmorphism Popup Modal */
+    .popup-backdrop {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background: rgba(15, 23, 42, 0.6);
+      backdrop-filter: blur(4px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 9999;
+      opacity: 0;
+      visibility: hidden;
+      transition: all 0.25s ease;
+      padding: 20px;
+    }
+
+    .popup-backdrop.active {
+      opacity: 1;
+      visibility: visible;
+    }
+
+    .popup-card {
+      background: #ffffff;
+      border-radius: 20px;
+      max-width: 420px;
+      width: 100%;
+      padding: 24px;
+      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2);
+      transform: scale(0.9);
+      transition: all 0.25s ease;
+    }
+
+    .popup-backdrop.active .popup-card {
+      transform: scale(1);
+    }
+
+    .popup-icon {
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 24px;
+      font-weight: bold;
+      margin-bottom: 16px;
+    }
+
+    .popup-error .popup-icon { background: #fee2e2; color: #dc2626; }
+    .popup-success .popup-icon { background: #dcfce7; color: #166534; }
+
+    .popup-btn {
+      border: none;
+      border-radius: 10px;
+      padding: 10px 18px;
+      font-weight: 600;
+      width: 100%;
+      margin-top: 16px;
+    }
+
+    .popup-error .popup-btn { background: #dc2626; color: white; }
+    .popup-success .popup-btn { background: #166534; color: white; }
   </style>
 </head>
 <body>
@@ -141,12 +215,15 @@
 
   <div class="card-custom">
     <div class="text-center mb-4">
-      <h4 class="fw-bold m-0" style="color: var(--text-main);">Attendance Form</h4>
-      <p class="text-muted small m-0 mt-1">Cascading location & employee selection</p>
+      <h4 class="fw-bold m-0" style="color: var(--text-main);">Attendance Tracker</h4>
+      <p class="text-muted small m-0 mt-1">Cascading location & live GPS capture</p>
     </div>
 
-    <!-- Alert Box for Validation / Messages -->
-    <div id="alertBox" class="alert alert-danger small d-none" role="alert"></div>
+    <!-- GPS Display Indicator -->
+    <div class="location-box mb-3 d-flex align-items-center justify-content-between">
+      <span>📍 Location: <strong id="gpsDisplay">Acquiring GPS...</strong></span>
+      <button type="button" class="btn btn-sm btn-link p-0 text-decoration-none" onclick="getGPSLocation()">Refresh</button>
+    </div>
 
     <form id="attendanceForm">
       
@@ -198,7 +275,7 @@
         </select>
       </div>
 
-      <!-- 7. Attendance Type Segmented Toggle -->
+      <!-- 7. Attendance Type -->
       <div class="mb-3">
         <label class="form-label d-block">Attendance Type <span class="text-danger">*</span></label>
         <div class="segmented-control">
@@ -210,7 +287,7 @@
         </div>
       </div>
 
-      <!-- 8. Remarks (Optional) -->
+      <!-- 8. Remarks -->
       <div class="mb-4">
         <label class="form-label">Remarks <span class="text-muted fw-normal">(Optional)</span></label>
         <textarea id="remarks" class="form-control" rows="2" placeholder="Write any optional notes..."></textarea>
@@ -221,24 +298,60 @@
   </div>
 </div>
 
+<!-- Modern Popup Modal -->
+<div id="popupModal" class="popup-backdrop popup-error">
+  <div class="popup-card text-center" tabindex="-1" id="popupCard">
+    <div id="popupIcon" class="popup-icon mx-auto">!</div>
+    <h5 id="popupTitle" class="fw-bold mb-2">Attention Required</h5>
+    <p id="popupMessage" class="text-muted small mb-0"></p>
+    <button type="button" class="popup-btn" id="popupCloseBtn" onclick="closePopup()">Acknowledge</button>
+  </div>
+</div>
+
 <script>
   // INSERT YOUR DEPLOYED GOOGLE APPS SCRIPT URL HERE
   const GAS_API_URL = "https://script.google.com/macros/s/AKfycbyLEMc5wnhuEbJXp7hP5Pmxhs4kKRU5LZABFqyd4ZnqJaWjJaVqUJhnqMFZPhXGUhFO-g/exec";
 
   let masterRoster = [];
+  let currentCoordinates = "Fetching GPS...";
 
-  // Register Service Worker for offline launch
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('./sw.js').catch(err => console.log('SW failed:', err));
+    navigator.serviceWorker.register('./sw.js').catch(err => console.log('SW registration error:', err));
   }
 
   window.addEventListener('load', () => {
     updateNetworkStatus();
+    getGPSLocation();
     loadRosterData();
   });
 
   window.addEventListener('online', updateNetworkStatus);
   window.addEventListener('offline', updateNetworkStatus);
+
+  // Real GPS Capture
+  function getGPSLocation() {
+    const display = document.getElementById('gpsDisplay');
+    display.textContent = "Acquiring GPS...";
+
+    if ("geolocation" in navigator) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const lat = position.coords.latitude.toFixed(6);
+          const lng = position.coords.longitude.toFixed(6);
+          currentCoordinates = `Lat: ${lat}, Long: ${lng}`;
+          display.textContent = currentCoordinates;
+        },
+        (error) => {
+          currentCoordinates = "GPS Permission Denied / Signal Lost";
+          display.textContent = "GPS Unavailable";
+        },
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+      );
+    } else {
+      currentCoordinates = "GPS Not Supported";
+      display.textContent = "GPS Not Supported";
+    }
+  }
 
   function updateNetworkStatus() {
     const statusEl = document.getElementById('networkStatus');
@@ -264,8 +377,7 @@
     }
   }
 
-  // --- DYNAMIC CASCADING DROPDOWN LOGIC ---
-
+  // Cascading Logic
   function loadRosterData() {
     if (navigator.onLine) {
       fetch(GAS_API_URL, {
@@ -294,7 +406,7 @@
       masterRoster = JSON.parse(cache);
       initProjectDropdown();
     } else {
-      showAlert("No offline employee cache found. Please connect to internet once.");
+      showPopup("No Offline Cache", "No offline employee roster found. Connect online once to initialize.", "error");
     }
   }
 
@@ -305,12 +417,12 @@
   }
 
   function onProjectChange() {
-    const selectedProject = document.getElementById('project').value;
-    if (!selectedProject) { resetDownstream('project'); return; }
+    const proj = document.getElementById('project').value;
+    if (!proj) { resetDownstream('project'); return; }
 
-    const filtered = masterRoster.filter(e => e.project === selectedProject);
+    const filtered = masterRoster.filter(e => e.project === proj);
     const orgs = [...new Set(filtered.map(e => e.organization))].filter(Boolean);
-    
+
     populateSelect('organization', orgs, '-- Select Organization --');
     document.getElementById('organization').disabled = false;
     resetDownstream('organization');
@@ -322,9 +434,9 @@
     if (!org) { resetDownstream('organization'); return; }
 
     const filtered = masterRoster.filter(e => e.project === proj && e.organization === org);
-    const districts = [...new Set(filtered.map(e => e.district))].filter(Boolean);
+    const dists = [...new Set(filtered.map(e => e.district))].filter(Boolean);
 
-    populateSelect('district', districts, '-- Select District --');
+    populateSelect('district', dists, '-- Select District --');
     document.getElementById('district').disabled = false;
     resetDownstream('district');
   }
@@ -351,9 +463,9 @@
     if (!uc) { resetDownstream('unionCouncil'); return; }
 
     const filtered = masterRoster.filter(e => e.project === proj && e.organization === org && e.district === dist && e.unionCouncil === uc);
-    const designations = [...new Set(filtered.map(e => e.designation))].filter(Boolean);
+    const desigs = [...new Set(filtered.map(e => e.designation))].filter(Boolean);
 
-    populateSelect('designation', designations, '-- Select Designation --');
+    populateSelect('designation', desigs, '-- Select Designation --');
     document.getElementById('designation').disabled = false;
     resetDownstream('designation');
   }
@@ -366,50 +478,72 @@
     const desig = document.getElementById('designation').value;
     if (!desig) { resetDownstream('designation'); return; }
 
-    const filtered = masterRoster.filter(e => 
-      e.project === proj && 
-      e.organization === org && 
-      e.district === dist && 
-      e.unionCouncil === uc && 
-      e.designation === desig
-    );
+    const filtered = masterRoster.filter(e => e.project === proj && e.organization === org && e.district === dist && e.unionCouncil === uc && e.designation === desig);
     const names = [...new Set(filtered.map(e => e.fullName))].filter(Boolean);
 
     populateSelect('fullName', names, '-- Select Full Name --');
     document.getElementById('fullName').disabled = false;
   }
 
-  function onNameChange() {
-    hideAlert();
-  }
+  function onNameChange() {}
 
-  function populateSelect(elementId, items, placeholder) {
-    const select = document.getElementById(elementId);
-    select.innerHTML = `<option value="">${placeholder}</option>` + 
-      items.map(item => `<option value="${item}">${item}</option>`).join('');
+  function populateSelect(id, items, placeholder) {
+    const el = document.getElementById(id);
+    el.innerHTML = `<option value="">${placeholder}</option>` + items.map(i => `<option value="${i}">${i}</option>`).join('');
   }
 
   function resetDownstream(level) {
-    const sequence = ['project', 'organization', 'district', 'unionCouncil', 'designation', 'fullName'];
-    const startIndex = sequence.indexOf(level) + 1;
+    const seq = ['project', 'organization', 'district', 'unionCouncil', 'designation', 'fullName'];
+    const startIndex = seq.indexOf(level) + 1;
 
-    for (let i = startIndex; i < sequence.length; i++) {
-      const field = document.getElementById(sequence[i]);
-      field.innerHTML = `<option value="">-- Select ${formatLabel(sequence[i - 1])} First --</option>`;
+    for (let i = startIndex; i < seq.length; i++) {
+      const field = document.getElementById(seq[i]);
+      field.innerHTML = `<option value="">-- Select ${formatLabel(seq[i - 1])} First --</option>`;
       field.disabled = true;
       field.value = "";
     }
   }
 
-  function formatLabel(str) {
-    return str.replace(/([A-Z])/g, ' $1').replace(/^./, s => s.toUpperCase());
+  function formatLabel(s) {
+    return s.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());
   }
 
-  // --- FORM SUBMISSION & DOUBLE CHECK-IN VALIDATION ---
+  // --- SAME DAY ATTENDANCE VALIDATION ---
+  function validateSameDayFlow(name, type, todayStr) {
+    const queue = JSON.parse(localStorage.getItem('offline_attendance_queue') || '[]');
+    const history = JSON.parse(localStorage.getItem('submitted_attendance_logs') || '[]');
+    const allRecords = [...queue, ...history];
 
+    const todayRecords = allRecords.filter(r => 
+      r.fullName.trim().toLowerCase() === name.trim().toLowerCase() && 
+      r.time.startsWith(todayStr)
+    );
+
+    const hasCheckIn = todayRecords.some(r => r.type === 'Check-In');
+    const hasCheckOut = todayRecords.some(r => r.type === 'Check-Out');
+
+    if (type === 'Check-Out' && !hasCheckIn) {
+      return { valid: false, msg: `Check-Out Blocked: ${name} has not checked in today (${todayStr}).` };
+    }
+
+    if (type === 'Check-In' && hasCheckIn) {
+      return { valid: false, msg: `Check-In Blocked: ${name} has already checked in today (${todayStr}).` };
+    }
+
+    if (type === 'Check-Out' && hasCheckOut) {
+      return { valid: false, msg: `Check-Out Blocked: ${name} has already checked out today (${todayStr}).` };
+    }
+
+    if (hasCheckIn && hasCheckOut) {
+      return { valid: false, msg: `Attendance Complete: ${name} has completed both Check-In and Check-Out today (${todayStr}).` };
+    }
+
+    return { valid: true };
+  }
+
+  // Submit Handler
   document.getElementById('attendanceForm').addEventListener('submit', function(e) {
     e.preventDefault();
-    hideAlert();
 
     const proj = document.getElementById('project').value;
     const org = document.getElementById('organization').value;
@@ -420,20 +554,20 @@
     const type = document.querySelector('input[name="type"]:checked').value;
     const remarks = document.getElementById('remarks').value;
 
-    // 1. Mandatory Field Check
     if (!proj || !org || !dist || !uc || !desig || !name) {
-      showAlert("All fields are required except remarks.");
+      showPopup("Missing Fields", "All fields are required excluding remarks.", "error");
       return;
     }
 
     const d = new Date();
     const pad = n => String(n).padStart(2, '0');
-    const timestamp = `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
-    const todayDateStr = `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`;
+    const todayStr = `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`;
+    const timestamp = `${todayStr} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
 
-    // 2. Client-Side Double Check-In Validation
-    if (type === 'Check-In' && isDoubleCheckInLocally(name, todayDateStr)) {
-      showAlert(`Validation Error: ${name} has already checked in today (${todayDateStr}).`);
+    // Client-side same-day rules check
+    const check = validateSameDayFlow(name, type, todayStr);
+    if (!check.valid) {
+      showPopup("Validation Error", check.msg, "error");
       return;
     }
 
@@ -448,6 +582,7 @@
       fullName: name,
       type: type,
       time: timestamp,
+      location: currentCoordinates,
       remarks: remarks
     };
 
@@ -455,22 +590,10 @@
       sendToServer(record);
     } else {
       saveLocally(record);
-      alert('[OFFLINE MODE] Saved locally. Will auto-sync when online.');
+      showPopup("Saved Offline", "Record saved locally. It will auto-sync when back online.", "success");
       resetForm();
     }
   });
-
-  function isDoubleCheckInLocally(name, dateStr) {
-    const queue = JSON.parse(localStorage.getItem('offline_attendance_queue') || '[]');
-    const history = JSON.parse(localStorage.getItem('submitted_attendance_logs') || '[]');
-    const combined = [...queue, ...history];
-
-    return combined.some(r => 
-      r.fullName.toLowerCase() === name.toLowerCase() && 
-      r.type === 'Check-In' && 
-      r.time.startsWith(dateStr)
-    );
-  }
 
   function sendToServer(record) {
     const btn = document.getElementById('submitBtn');
@@ -488,13 +611,13 @@
 
       if (res.status === 'SUCCESS') {
         cacheSubmittedRecord(record);
-        alert("Attendance submitted successfully!");
+        showPopup("Success", `${record.type} recorded for ${record.fullName}!`, "success");
         resetForm();
       } else if (res.status === 'VALIDATION_FAILED') {
-        showAlert(res.message);
+        showPopup("Submission Denied", res.message, "error");
       } else {
         saveLocally(record);
-        alert("Server issue: Saved to local offline queue.");
+        showPopup("Offline Saved", "Saved to local offline queue.", "success");
         resetForm();
       }
     })
@@ -502,7 +625,7 @@
       btn.disabled = false;
       btn.textContent = "Submit Attendance";
       saveLocally(record);
-      alert("Network interrupted: Saved to offline queue.");
+      showPopup("Saved Offline", "Network error. Saved to local offline queue.", "success");
       resetForm();
     });
   }
@@ -536,7 +659,7 @@
         if (completed === queue.length) {
           localStorage.setItem('offline_attendance_queue', JSON.stringify([]));
           updateQueueBadge();
-          alert("All offline attendance records synced!");
+          showPopup("Synced", "All offline attendance records synced to server!", "success");
         }
       });
     });
@@ -546,17 +669,32 @@
     document.getElementById('attendanceForm').reset();
     document.getElementById('typeIn').checked = true;
     initProjectDropdown();
-    hideAlert();
   }
 
-  function showAlert(msg) {
-    const alertBox = document.getElementById('alertBox');
-    alertBox.textContent = msg;
-    alertBox.classList.remove('d-none');
+  // Modern Popup Dialog Controls
+  function showPopup(title, message, type = "error") {
+    const modal = document.getElementById('popupModal');
+    const card = document.getElementById('popupCard');
+    const icon = document.getElementById('popupIcon');
+
+    document.getElementById('popupTitle').textContent = title;
+    document.getElementById('popupMessage').textContent = message;
+
+    if (type === "success") {
+      modal.className = "popup-backdrop popup-success active";
+      icon.textContent = "✓";
+    } else {
+      modal.className = "popup-backdrop popup-error active";
+      icon.textContent = "!";
+    }
+
+    // Automatically shift screen focus and awareness control to the popup dialog
+    card.focus();
   }
 
-  function hideAlert() {
-    document.getElementById('alertBox').classList.add('d-none');
+  function closePopup() {
+    const modal = document.getElementById('popupModal');
+    modal.classList.remove('active');
   }
 </script>
 </body>

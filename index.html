@@ -4,7 +4,6 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   
-  <!-- Cache Control to ensure instant GitHub updates -->
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
@@ -51,7 +50,6 @@
       padding: 24px 20px;
     }
 
-    /* Top Status & Pending Chip */
     .status-bar {
       display: flex;
       justify-content: space-between;
@@ -128,6 +126,7 @@
       padding: 4px;
       border-radius: 14px;
       border: 1px solid var(--border-color);
+      gap: 4px;
     }
 
     .segmented-control input[type="radio"] {
@@ -137,9 +136,9 @@
     .segmented-control label {
       flex: 1;
       text-align: center;
-      padding: 10px 12px;
+      padding: 10px 8px;
       font-weight: 600;
-      font-size: 0.88rem;
+      font-size: 0.84rem;
       color: var(--text-muted);
       border-radius: 10px;
       cursor: pointer;
@@ -256,7 +255,6 @@
 
 <div class="container app-container">
 
-  <!-- Top Status Bar with Pending Queue Chip -->
   <div class="status-bar">
     <span id="networkStatus" class="chip-badge chip-online">● Online</span>
     <span id="queueStatus" class="chip-badge chip-sync">Sync Queue: 0</span>
@@ -302,7 +300,7 @@
         </select>
       </div>
 
-      <!-- 5. Full Name (Positioned above Designation) -->
+      <!-- 5. Full Name -->
       <div class="mb-3">
         <label class="form-label">Full Name <span class="text-danger">*</span></label>
         <select id="fullName" class="form-select" onchange="onFullNameChange()" required disabled>
@@ -310,7 +308,7 @@
         </select>
       </div>
 
-      <!-- 6. Designation (Positioned below Full Name) -->
+      <!-- 6. Designation -->
       <div class="mb-3">
         <label class="form-label">Designation <span class="text-danger">*</span></label>
         <select id="designation" class="form-select" required disabled>
@@ -318,7 +316,7 @@
         </select>
       </div>
 
-      <!-- 7. Attendance Type -->
+      <!-- 7. Attendance Type (Includes Leave Option) -->
       <div class="mb-3">
         <label class="form-label d-block">Attendance Type <span class="text-danger">*</span></label>
         <div class="segmented-control">
@@ -327,6 +325,9 @@
           
           <input type="radio" name="type" id="typeOut" value="Check-Out">
           <label for="typeOut">Check-Out</label>
+
+          <input type="radio" name="type" id="typeLeave" value="Leave">
+          <label for="typeLeave">Leave</label>
         </div>
       </div>
 
@@ -336,7 +337,7 @@
         <input type="text" id="timeDisplay" class="form-control" readonly placeholder="Capturing time...">
       </div>
 
-      <!-- 9. Location (Clean format without Lat: or Long: prefixes) -->
+      <!-- 9. Location -->
       <div class="mb-2">
         <div class="d-flex justify-content-between align-items-center mb-1">
           <label class="form-label m-0">Location</label>
@@ -350,12 +351,12 @@
         <input type="text" id="locationDisplay" class="form-control" readonly placeholder="Acquiring GPS coordinates...">
       </div>
 
-      <!-- 10. Read-Only Leaflet Map -->
+      <!-- 10. Map -->
       <div id="mapContainer"></div>
 
       <!-- 11. Remarks -->
       <div class="mb-4">
-        <label class="form-label">Remarks <span class="text-muted fw-normal">(Optional)</span></label>
+        <label class="form-label">Remarks <span class="text-muted fw-normal">(Optional / Reason for Leave)</span></label>
         <textarea id="remarks" class="form-control" rows="2" placeholder="Write any optional notes..."></textarea>
       </div>
 
@@ -364,7 +365,6 @@
   </div>
 </div>
 
-<!-- Modern Popup Modal -->
 <div id="popupModal" class="popup-backdrop popup-error">
   <div class="popup-card" tabindex="-1" id="popupCard">
     <div id="popupIcon" class="popup-icon">!</div>
@@ -389,7 +389,7 @@
   // Auto-Update Engine
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('./sw.js').then(reg => {
-      reg.update(); // Check for GitHub updates on every page launch
+      reg.update();
 
       reg.onupdatefound = () => {
         const installingWorker = reg.installing;
@@ -421,7 +421,6 @@
   window.addEventListener('online', updateNetworkStatus);
   window.addEventListener('offline', updateNetworkStatus);
 
-  // --- AUTOMATIC CLOCK ENGINE ---
   function initClock() {
     updateClock();
     setInterval(updateClock, 1000);
@@ -434,18 +433,9 @@
     document.getElementById('timeDisplay').value = formatted;
   }
 
-  // --- READ-ONLY MAP & GPS ENGINE ---
   function initLeafletMap() {
-    map = L.map('mapContainer', {
-      zoomControl: true,
-      dragging: true,
-      scrollWheelZoom: false
-    }).setView([20.0, 0.0], 2);
-
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      maxZoom: 19,
-      attribution: '© OpenStreetMap'
-    }).addTo(map);
+    map = L.map('mapContainer', { zoomControl: true, dragging: true, scrollWheelZoom: false }).setView([20.0, 0.0], 2);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap' }).addTo(map);
   }
 
   function fetchGPSLocation() {
@@ -457,10 +447,15 @@
       return;
     }
 
-    const options = { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 };
-
     navigator.geolocation.getCurrentPosition(
       (position) => {
+        // Location Tampering Detection Check
+        if (position.coords.accuracy > 1500) {
+          locInput.value = "Location Tampering Detected / Mock GPS";
+          showPopup("GPS Warning", "Mock GPS or inaccurate location detected. Please enable high-accuracy real GPS.", "error");
+          return;
+        }
+
         capturedLat = position.coords.latitude.toFixed(6);
         capturedLng = position.coords.longitude.toFixed(6);
         locInput.value = `${capturedLat}, ${capturedLng}`;
@@ -468,36 +463,17 @@
         const latLng = [parseFloat(capturedLat), parseFloat(capturedLng)];
         map.setView(latLng, 16);
 
-        if (mapMarker) {
-          mapMarker.setLatLng(latLng);
-        } else {
-          mapMarker = L.marker(latLng).addTo(map);
-        }
+        if (mapMarker) mapMarker.setLatLng(latLng);
+        else mapMarker = L.marker(latLng).addTo(map);
       },
-      (error) => {
-        navigator.geolocation.getCurrentPosition(
-          (fallbackPos) => {
-            capturedLat = fallbackPos.coords.latitude.toFixed(6);
-            capturedLng = fallbackPos.coords.longitude.toFixed(6);
-            locInput.value = `${capturedLat}, ${capturedLng}`;
-
-            const latLng = [parseFloat(capturedLat), parseFloat(capturedLng)];
-            map.setView(latLng, 15);
-            if (mapMarker) mapMarker.setLatLng(latLng);
-            else mapMarker = L.marker(latLng).addTo(map);
-          },
-          (err) => {
-            locInput.value = "GPS Access Denied / Unavailable";
-            showPopup("GPS Required", "Please allow location permissions and tap the refresh button.", "error");
-          },
-          { enableHighAccuracy: false, timeout: 10000, maximumAge: 60000 }
-        );
+      () => {
+        locInput.value = "GPS Access Denied / Unavailable";
+        showPopup("GPS Required", "Please enable GPS location permissions.", "error");
       },
-      options
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
     );
   }
 
-  // --- NETWORK & SYNC CHIP CONTROLLER ---
   function updateNetworkStatus() {
     const statusEl = document.getElementById('networkStatus');
     if (navigator.onLine) {
@@ -525,7 +501,6 @@
     }
   }
 
-  // --- CASCADING DROPDOWNS ---
   function loadRosterData() {
     if (navigator.onLine) {
       fetch(GAS_API_URL, {
@@ -553,8 +528,6 @@
     if (cache) {
       masterRoster = JSON.parse(cache);
       initProjectDropdown();
-    } else {
-      showPopup("No Roster Cache", "Please connect online once to load employee data.", "error");
     }
   }
 
@@ -657,29 +630,6 @@
     return s.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());
   }
 
-  // --- LOCAL OFFLINE VALIDATION ---
-  function validateOfflineFlow(name, type, todayStr) {
-    const queue = JSON.parse(localStorage.getItem('offline_attendance_queue') || '[]');
-    const todayRecords = queue.filter(r => 
-      r.fullName.trim().toLowerCase() === name.trim().toLowerCase() && 
-      r.time.startsWith(todayStr)
-    );
-
-    const hasCheckIn = todayRecords.some(r => r.type === 'Check-In');
-    const hasCheckOut = todayRecords.some(r => r.type === 'Check-Out');
-
-    if (type === 'Check-Out' && !hasCheckIn) {
-      return { valid: false, msg: `Offline Block: ${name} has not checked in locally today (${todayStr}).` };
-    }
-    if (type === 'Check-In' && hasCheckIn) {
-      return { valid: false, msg: `Offline Block: ${name} already checked in locally today (${todayStr}).` };
-    }
-    if (type === 'Check-Out' && hasCheckOut) {
-      return { valid: false, msg: `Offline Block: ${name} already checked out locally today (${todayStr}).` };
-    }
-    return { valid: true };
-  }
-
   // --- FORM SUBMISSION HANDLER ---
   document.getElementById('attendanceForm').addEventListener('submit', function(e) {
     e.preventDefault();
@@ -687,8 +637,8 @@
     const timeVal = document.getElementById('timeDisplay').value;
     const locVal = document.getElementById('locationDisplay').value;
 
-    if (!locVal || locVal.includes("Acquiring") || locVal.includes("Denied") || locVal.includes("Unavailable")) {
-      showPopup("GPS Location Required", "Valid location coordinates are required. Tap the refresh icon to acquire location.", "error");
+    if (!locVal || locVal.includes("Acquiring") || locVal.includes("Denied") || locVal.includes("Unavailable") || locVal.includes("Tampering")) {
+      showPopup("Location Error", "Valid GPS coordinates are required. Tap the refresh icon to acquire location.", "error");
       return;
     }
 
@@ -706,8 +656,6 @@
       return;
     }
 
-    const todayStr = timeVal.split(' ')[0];
-
     const record = {
       uid: 'UID-' + Date.now(),
       email: 'pwa-user@app.local',
@@ -723,18 +671,7 @@
       remarks: remarks
     };
 
-    if (navigator.onLine) {
-      sendToServer(record);
-    } else {
-      const check = validateOfflineFlow(name, type, todayStr);
-      if (!check.valid) {
-        showPopup("Validation Error", check.msg, "error");
-        return;
-      }
-      saveLocally(record);
-      showPopup("Saved Offline", "Record stored locally. It will auto-sync when online.", "success");
-      resetForm();
-    }
+    sendToServer(record);
   });
 
   function sendToServer(record) {
@@ -754,8 +691,39 @@
       if (res.status === 'SUCCESS') {
         showPopup("Success", `${record.type} recorded for ${record.fullName}!`, "success");
         resetForm();
-      } else if (res.status === 'VALIDATION_FAILED') {
-        showPopup("Denied by Server", res.message, "error");
+      } 
+      else if (res.status === 'SUCCESS_LEAVE') {
+        // LEAVE LOGIC: REDIRECT TO GMAIL / MAIL CLIENT
+        const hrEmail = (res.emails && res.emails.hr) ? res.emails.hr : '';
+        const ccEmails = [];
+        if (res.emails && res.emails.sbcc) ccEmails.push(res.emails.sbcc);
+        if (res.emails && res.emails.epi) ccEmails.push(res.emails.epi);
+
+        const dateStr = record.time.split(' ')[0];
+        const subject = encodeURIComponent(`Leave Application - ${record.fullName} (${record.district})`);
+        const body = encodeURIComponent(
+          `Dear HR Officer,\n\nI am submitting my leave application for today (${dateStr}).\n\n` +
+          `Employee Details:\n` +
+          `- Full Name: ${record.fullName}\n` +
+          `- Designation: ${record.designation}\n` +
+          `- District: ${record.district}\n` +
+          `- Union Council: ${record.unionCouncil}\n` +
+          `- Project: ${record.project}\n` +
+          `- Reason / Remarks: ${record.remarks || 'N/A'}\n\n` +
+          `Regards,\n${record.fullName}`
+        );
+
+        const mailtoUrl = `mailto:${hrEmail}?cc=${ccEmails.join(',')}&subject=${subject}&body=${body}`;
+
+        showPopup("Leave Recorded", "Leave recorded in Google Sheets. Opening Gmail app...", "success");
+
+        setTimeout(() => {
+          window.location.href = mailtoUrl;
+          resetForm();
+        }, 1800);
+      }
+      else if (res.status === 'VALIDATION_FAILED') {
+        showPopup("Submission Blocked", res.message, "error");
       } else {
         saveLocally(record);
         showPopup("Saved Offline", "Server error. Saved to offline queue.", "success");

@@ -18,7 +18,10 @@
       --accent-color: #2563eb;
       --accent-hover: #1d4ed8;
       --border-color: #e2e8f0;
-      --danger-color: #ef4444;
+      --success-bg: #dcfce7;
+      --success-text: #166534;
+      --warning-bg: #fef3c7;
+      --warning-text: #92400e;
     }
 
     body {
@@ -124,19 +127,34 @@
       border-radius: 20px;
     }
 
-    .status-online { background-color: #dcfce7; color: #166534; }
-    .status-offline { background-color: #fef3c7; color: #92400e; }
+    .status-online { background-color: var(--success-bg); color: var(--success-text); }
+    .status-offline { background-color: var(--warning-bg); color: var(--warning-text); }
 
-    .location-box {
-      font-size: 0.8rem;
-      background: #f1f5f9;
-      border: 1px solid #e2e8f0;
-      border-radius: 8px;
-      padding: 8px 12px;
+    /* GPS Box Styling */
+    .gps-container {
+      background: #f8fafc;
+      border: 1.5px dashed var(--border-color);
+      border-radius: 12px;
+      padding: 12px 16px;
+    }
+
+    .gps-container.locked {
+      background: #f0fdf4;
+      border-color: #86efac;
+    }
+
+    .gps-text {
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--text-main);
+    }
+
+    .gps-subtext {
+      font-size: 0.75rem;
       color: var(--text-muted);
     }
 
-    /* Modern Glassmorphism Popup Modal */
+    /* Modern Popup Modal */
     .popup-backdrop {
       position: fixed;
       top: 0;
@@ -216,13 +234,18 @@
   <div class="card-custom">
     <div class="text-center mb-4">
       <h4 class="fw-bold m-0" style="color: var(--text-main);">Attendance Tracker</h4>
-      <p class="text-muted small m-0 mt-1">Cascading location & live GPS capture</p>
+      <p class="text-muted small m-0 mt-1">Cascading location & real GPS lock</p>
     </div>
 
-    <!-- GPS Display Indicator -->
-    <div class="location-box mb-3 d-flex align-items-center justify-content-between">
-      <span>📍 Location: <strong id="gpsDisplay">Acquiring GPS...</strong></span>
-      <button type="button" class="btn btn-sm btn-link p-0 text-decoration-none" onclick="getGPSLocation()">Refresh</button>
+    <!-- Live GPS Coordinates Box -->
+    <div id="gpsBox" class="gps-container mb-4">
+      <div class="d-flex align-items-center justify-content-between">
+        <div>
+          <div class="gps-text" id="gpsStatusText">📍 Acquiring Location...</div>
+          <div class="gps-subtext" id="gpsCoordinates">Tap 'Acquire GPS' if prompt appears</div>
+        </div>
+        <button type="button" class="btn btn-sm btn-outline-primary fw-bold" onclick="requestGPSCoordinates()">Acquire GPS</button>
+      </div>
     </div>
 
     <form id="attendanceForm">
@@ -310,10 +333,10 @@
 
 <script>
   // INSERT YOUR DEPLOYED GOOGLE APPS SCRIPT URL HERE
-  const GAS_API_URL = "https://script.google.com/macros/s/AKfycbyLEMc5wnhuEbJXp7hP5Pmxhs4kKRU5LZABFqyd4ZnqJaWjJaVqUJhnqMFZPhXGUhFO-g/exec";
+  const GAS_API_URL = "YOUR_DEPLOYED_WEB_APP_URL_HERE";
 
   let masterRoster = [];
-  let currentCoordinates = "Fetching GPS...";
+  let capturedLocation = null; // Stores object { lat, lng, formatted }
 
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('./sw.js').catch(err => console.log('SW registration error:', err));
@@ -321,36 +344,73 @@
 
   window.addEventListener('load', () => {
     updateNetworkStatus();
-    getGPSLocation();
+    requestGPSCoordinates();
     loadRosterData();
   });
 
   window.addEventListener('online', updateNetworkStatus);
   window.addEventListener('offline', updateNetworkStatus);
 
-  // Real GPS Capture
-  function getGPSLocation() {
-    const display = document.getElementById('gpsDisplay');
-    display.textContent = "Acquiring GPS...";
+  // --- SMART GPS ENGINE WITH FALLBACK ---
+  function requestGPSCoordinates() {
+    const box = document.getElementById('gpsBox');
+    const statusText = document.getElementById('gpsStatusText');
+    const coordsText = document.getElementById('gpsCoordinates');
 
-    if ("geolocation" in navigator) {
+    statusText.textContent = "📍 Requesting Location...";
+    coordsText.textContent = "Searching for satellites / cell signal...";
+    box.classList.remove('locked');
+
+    return new Promise((resolve) => {
+      if (!("geolocation" in navigator)) {
+        statusText.textContent = "⚠️ GPS Not Supported";
+        coordsText.textContent = "Browser does not support geolocation.";
+        capturedLocation = null;
+        resolve(null);
+        return;
+      }
+
+      // Try High Accuracy First
       navigator.geolocation.getCurrentPosition(
-        (position) => {
-          const lat = position.coords.latitude.toFixed(6);
-          const lng = position.coords.longitude.toFixed(6);
-          currentCoordinates = `Lat: ${lat}, Long: ${lng}`;
-          display.textContent = currentCoordinates;
+        (pos) => {
+          setGPSSuccess(pos);
+          resolve(capturedLocation);
         },
-        (error) => {
-          currentCoordinates = "GPS Permission Denied / Signal Lost";
-          display.textContent = "GPS Unavailable";
+        (err) => {
+          // Fallback to Standard Accuracy (Cellular / Wi-Fi) if high accuracy times out
+          navigator.geolocation.getCurrentPosition(
+            (fallbackPos) => {
+              setGPSSuccess(fallbackPos);
+              resolve(capturedLocation);
+            },
+            (finalErr) => {
+              statusText.textContent = "⚠️ Location Access Denied / Failed";
+              coordsText.textContent = "Please allow Location permission in browser settings.";
+              capturedLocation = null;
+              resolve(null);
+            },
+            { enableHighAccuracy: false, timeout: 8000, maximumAge: 60000 }
+          );
         },
-        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+        { enableHighAccuracy: true, timeout: 6000, maximumAge: 10000 }
       );
-    } else {
-      currentCoordinates = "GPS Not Supported";
-      display.textContent = "GPS Not Supported";
-    }
+    });
+  }
+
+  function setGPSSuccess(pos) {
+    const lat = pos.coords.latitude.toFixed(6);
+    const lng = pos.coords.longitude.toFixed(6);
+    const formatted = `Lat: ${lat}, Long: ${lng}`;
+
+    capturedLocation = { lat: lat, lng: lng, formatted: formatted };
+
+    const box = document.getElementById('gpsBox');
+    const statusText = document.getElementById('gpsStatusText');
+    const coordsText = document.getElementById('gpsCoordinates');
+
+    box.classList.add('locked');
+    statusText.textContent = "✓ GPS Location Locked";
+    coordsText.textContent = formatted;
   }
 
   function updateNetworkStatus() {
@@ -377,7 +437,7 @@
     }
   }
 
-  // Cascading Logic
+  // --- CASCADING DROPDOWNS ---
   function loadRosterData() {
     if (navigator.onLine) {
       fetch(GAS_API_URL, {
@@ -508,7 +568,7 @@
     return s.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());
   }
 
-  // --- SAME DAY ATTENDANCE VALIDATION ---
+  // --- SAME DAY RULES VALIDATION ---
   function validateSameDayFlow(name, type, todayStr) {
     const queue = JSON.parse(localStorage.getItem('offline_attendance_queue') || '[]');
     const history = JSON.parse(localStorage.getItem('submitted_attendance_logs') || '[]');
@@ -541,8 +601,8 @@
     return { valid: true };
   }
 
-  // Submit Handler
-  document.getElementById('attendanceForm').addEventListener('submit', function(e) {
+  // --- FORM SUBMIT HANDLER ---
+  document.getElementById('attendanceForm').addEventListener('submit', async function(e) {
     e.preventDefault();
 
     const proj = document.getElementById('project').value;
@@ -556,6 +616,16 @@
 
     if (!proj || !org || !dist || !uc || !desig || !name) {
       showPopup("Missing Fields", "All fields are required excluding remarks.", "error");
+      return;
+    }
+
+    // Force GPS lock attempt if not acquired yet
+    if (!capturedLocation) {
+      await requestGPSCoordinates();
+    }
+
+    if (!capturedLocation) {
+      showPopup("GPS Required", "Could not capture your GPS coordinates. Please enable Location/GPS on your device and tap 'Acquire GPS'.", "error");
       return;
     }
 
@@ -582,7 +652,7 @@
       fullName: name,
       type: type,
       time: timestamp,
-      location: currentCoordinates,
+      location: capturedLocation.formatted,
       remarks: remarks
     };
 
@@ -590,7 +660,7 @@
       sendToServer(record);
     } else {
       saveLocally(record);
-      showPopup("Saved Offline", "Record saved locally. It will auto-sync when back online.", "success");
+      showPopup("Saved Offline", "Record saved locally with GPS coordinates. It will auto-sync when online.", "success");
       resetForm();
     }
   });
@@ -611,7 +681,7 @@
 
       if (res.status === 'SUCCESS') {
         cacheSubmittedRecord(record);
-        showPopup("Success", `${record.type} recorded for ${record.fullName}!`, "success");
+        showPopup("Success", `${record.type} recorded for ${record.fullName} with GPS coordinates!`, "success");
         resetForm();
       } else if (res.status === 'VALIDATION_FAILED') {
         showPopup("Submission Denied", res.message, "error");
@@ -659,7 +729,7 @@
         if (completed === queue.length) {
           localStorage.setItem('offline_attendance_queue', JSON.stringify([]));
           updateQueueBadge();
-          showPopup("Synced", "All offline attendance records synced to server!", "success");
+          showPopup("Synced", "All offline attendance records synced to Google Sheets!", "success");
         }
       });
     });
@@ -671,7 +741,7 @@
     initProjectDropdown();
   }
 
-  // Modern Popup Dialog Controls
+  // --- POPUP DIALOG CONTROLS ---
   function showPopup(title, message, type = "error") {
     const modal = document.getElementById('popupModal');
     const card = document.getElementById('popupCard');
@@ -688,7 +758,6 @@
       icon.textContent = "!";
     }
 
-    // Automatically shift screen focus and awareness control to the popup dialog
     card.focus();
   }
 

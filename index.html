@@ -215,7 +215,7 @@
       <div class="form-group">
         <label class="form-label"><i data-lucide="folder-kanban" style="width: 14px;"></i> Project</label>
         <select id="project" class="form-select" onchange="onProjectChange()" required>
-          <option value="">-- Loading Projects --</option>
+          <option value="">Loading Projects...</option>
         </select>
       </div>
 
@@ -249,7 +249,7 @@
 
       <div class="form-group">
         <label class="form-label"><i data-lucide="briefcase" style="width: 14px;"></i> Designation</label>
-        <select id="designation" class="form-select" required disabled>
+        <select id="designation" class="form-select" onchange="saveDropdownState('designation', this.value)" required disabled>
           <option value="">-- Select Full Name First --</option>
         </select>
       </div>
@@ -333,14 +333,14 @@
 <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
 
 <script>
-  const GAS_API_URL = "YOUR_DEPLOYED_WEB_APP_URL_HERE";
+  // Paste your deployed Google Apps Script Web App URL here
+  const GAS_API_URL = "https://script.google.com/macros/s/AKfycbyLEMc5wnhuEbJXp7hP5Pmxhs4kKRU5LZABFqyd4ZnqJaWjJaVqUJhnqMFZPhXGUhFO-g/exec";
 
   let masterRoster = [];
   let districtEmailsMap = {};
   let map = null, mapMarker = null;
   let datePickerInstance = null;
 
-  // MONOTONIC CLOCK TRACKING (TIME SPOOF DETECTOR)
   const bootPerfTime = performance.now();
   const bootWallTime = Date.now();
   let detectedTamperStatus = 'OK';
@@ -379,7 +379,6 @@
   window.addEventListener('online', () => { updateNetworkStatus(); syncOfflineQueue(); });
   window.addEventListener('offline', updateNetworkStatus);
 
-  /* TIME & LOCATION TAMPERING DETECTOR ENGINE */
   function verifyTimeIntegrity() {
     const perfElapsed = (performance.now() - bootPerfTime) / 1000;
     const wallElapsed = (Date.now() - bootWallTime) / 1000;
@@ -390,23 +389,6 @@
       showTamperAlert(`Clock Tampering Detected! Device time shifted by ${Math.round(drift)}s.`);
       return false;
     }
-
-    if (navigator.onLine) {
-      fetch('https://worldtimeapi.org/api/timezone/Etc/UTC', { method: 'GET', cache: 'no-store' })
-        .then(r => r.json())
-        .then(data => {
-          const networkTime = new Date(data.datetime).getTime();
-          const deviceTime = Date.now();
-          const netDriftMin = Math.abs(networkTime - deviceTime) / (1000 * 60);
-
-          if (netDriftMin > 3) {
-            detectedTamperStatus = `FLAGGED: Online Clock Mismatch (${Math.round(netDriftMin)}m)`;
-            showTamperAlert(`Device clock differs from Network Time by ${Math.round(netDriftMin)} mins.`);
-          }
-        })
-        .catch(() => {});
-    }
-
     return true;
   }
 
@@ -418,61 +400,60 @@
 
   function checkLocationTampering(coords, accuracy) {
     if (accuracy === 0) {
-      detectedTamperStatus = (detectedTamperStatus === 'OK') ? 'FLAGGED: Mock GPS (Zero Accuracy)' : detectedTamperStatus + ' | Mock GPS';
-      return;
+      detectedTamperStatus = (detectedTamperStatus === 'OK') ? 'FLAGGED: Mock GPS' : detectedTamperStatus + ' | Mock GPS';
     }
-
-    const lastGPS = localStorage.getItem('last_valid_gps_point');
-    if (lastGPS) {
-      try {
-        const prev = JSON.parse(lastGPS);
-        const distKm = calculateDistanceKm(prev.lat, prev.lng, coords.latitude, coords.longitude);
-        const hours = (Date.now() - prev.timestamp) / (1000 * 3600);
-        
-        if (hours > 0 && (distKm / hours) > 300) {
-          detectedTamperStatus = (detectedTamperStatus === 'OK') ? `FLAGGED: GPS Teleportation (${Math.round(distKm)}km in ${Math.round(hours*60)}m)` : detectedTamperStatus + ' | GPS Teleport';
-        }
-      } catch(e) {}
-    }
-
-    localStorage.setItem('last_valid_gps_point', JSON.stringify({
-      lat: coords.latitude,
-      lng: coords.longitude,
-      timestamp: Date.now()
-    }));
   }
 
-  function calculateDistanceKm(lat1, lon1, lat2, lon2) {
-    const R = 6371;
-    const dLat = (lat2 - lat1) * Math.PI / 180;
-    const dLon = (lon2 - lon1) * Math.PI / 180;
-    const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-              Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-              Math.sin(dLon/2) * Math.sin(dLon/2);
-    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  function normalizeRecord(item) {
+    if (!item || typeof item !== 'object') return {};
+    return {
+      project: String(item.project || item.Project || item['Project Name'] || '').trim(),
+      organization: String(item.organization || item.Organization || item['Org'] || '').trim(),
+      district: String(item.district || item.District || '').trim(),
+      unionCouncil: String(item.unionCouncil || item.UnionCouncil || item['Union Council'] || item['UC'] || '').trim(),
+      fullName: String(item.fullName || item.FullName || item['Full Name'] || item['Name'] || '').trim(),
+      designation: String(item.designation || item.Designation || item['Designation'] || '').trim()
+    };
   }
 
-  /* ROSTER & EMAIL DATA ENGINE */
+  /* ROSTER ENGINE WITH GET FALLBACK */
   function loadRosterData(forceFetch = false) {
     const cachedRoster = localStorage.getItem('employee_roster_cache');
     const cachedEmails = localStorage.getItem('district_emails_cache');
 
     if (!forceFetch && cachedRoster) {
-      masterRoster = JSON.parse(cachedRoster);
-      initProjectDropdown();
-      restoreSavedDropdownSelections();
-    }
-    if (!forceFetch && cachedEmails) {
-      districtEmailsMap = JSON.parse(cachedEmails);
+      try {
+        const raw = JSON.parse(cachedRoster);
+        if (Array.isArray(raw) && raw.length > 0) {
+          masterRoster = raw.map(normalizeRecord);
+          initProjectDropdown();
+          restoreSavedDropdownSelections();
+        }
+      } catch(e) {
+        console.error("Cache parse error:", e);
+      }
     }
 
-    if (navigator.onLine && GAS_API_URL !== "https://script.google.com/macros/s/AKfycbyLEMc5wnhuEbJXp7hP5Pmxhs4kKRU5LZABFqyd4ZnqJaWjJaVqUJhnqMFZPhXGUhFO-g/exec") {
-      fetch(GAS_API_URL, { method: 'POST', body: JSON.stringify({ action: 'getEmployees' }) })
+    if (!forceFetch && cachedEmails) {
+      try { districtEmailsMap = JSON.parse(cachedEmails); } catch(e) {}
+    }
+
+    if (!GAS_API_URL || GAS_API_URL.includes("YOUR_DEPLOYED_WEB_APP_URL_HERE")) {
+      document.getElementById('project').innerHTML = `<option value="">-- API URL Not Configured --</option>`;
+      return;
+    }
+
+    if (navigator.onLine) {
+      // Use GET request with query parameter to guarantee smooth CORS handling
+      const fetchUrl = `${GAS_API_URL}?action=getEmployees&t=${Date.now()}`;
+
+      fetch(fetchUrl, { method: 'GET' })
       .then(res => res.json())
       .then(res => {
-        if (res.status === 'SUCCESS') {
-          if (res.employees && res.employees.length > 0) {
-            masterRoster = res.employees;
+        if (res.status === 'SUCCESS' || res.employees) {
+          const list = res.employees || res.data || [];
+          if (list.length > 0) {
+            masterRoster = list.map(normalizeRecord);
             localStorage.setItem('employee_roster_cache', JSON.stringify(masterRoster));
           }
           if (res.emailsMap) {
@@ -484,14 +465,30 @@
           restoreSavedDropdownSelections();
 
           if (forceFetch) {
-            showPopup("Roster Updated", "Employee roster and district mappings refreshed successfully.", "success");
+            showPopup("Roster Updated", "Employee roster refreshed successfully.", "success");
           }
+        } else {
+          showProjectError("Failed to parse roster data from backend.");
         }
       })
-      .catch(() => {
-        if (forceFetch) showPopup("Sync Failed", "Could not reach server to update roster. Offline cache active.", "warning");
+      .catch((err) => {
+        console.warn("Roster fetch error:", err);
+        if (masterRoster.length === 0) {
+          showProjectError("Unable to connect to Google Sheet API.");
+        }
+        if (forceFetch) {
+          showPopup("Sync Failed", "Could not reach server. Cached roster remains active.", "warning");
+        }
       });
+    } else if (masterRoster.length === 0) {
+      showProjectError("Offline - Connect to internet to load roster.");
     }
+  }
+
+  function showProjectError(msg) {
+    const projSelect = document.getElementById('project');
+    projSelect.innerHTML = `<option value="">Error: ${msg}</option>`;
+    projSelect.disabled = true;
   }
 
   function refreshRosterCache() {
@@ -502,7 +499,10 @@
     loadRosterData(true);
   }
 
-  function saveDropdownState(key, value) { localStorage.setItem(`form_${key}`, value); }
+  function saveDropdownState(key, value) { 
+    if (value) localStorage.setItem(`form_${key}`, value);
+    else localStorage.removeItem(`form_${key}`);
+  }
 
   function restoreSavedDropdownSelections() {
     const savedProj = localStorage.getItem('form_project');
@@ -512,38 +512,83 @@
     const savedName = localStorage.getItem('form_fullName');
     const savedDesig = localStorage.getItem('form_designation');
 
-    if (savedProj) { document.getElementById('project').value = savedProj; onProjectChange(false); }
-    if (savedOrg) { document.getElementById('organization').value = savedOrg; onOrganizationChange(false); }
-    if (savedDist) { document.getElementById('district').value = savedDist; onDistrictChange(false); }
-    if (savedUc) { document.getElementById('unionCouncil').value = savedUc; onUnionCouncilChange(false); }
-    if (savedName) { document.getElementById('fullName').value = savedName; onFullNameChange(false); }
-    if (savedDesig) { document.getElementById('designation').value = savedDesig; }
+    if (savedProj) { 
+      document.getElementById('project').value = savedProj; 
+      onProjectChange(false); 
+    }
+    if (savedOrg) { 
+      document.getElementById('organization').value = savedOrg; 
+      onOrganizationChange(false); 
+    }
+    if (savedDist) { 
+      document.getElementById('district').value = savedDist; 
+      onDistrictChange(false); 
+    }
+    if (savedUc) { 
+      document.getElementById('unionCouncil').value = savedUc; 
+      onUnionCouncilChange(false); 
+    }
+    if (savedName) { 
+      document.getElementById('fullName').value = savedName; 
+      onFullNameChange(false); 
+    }
+    if (savedDesig) { 
+      document.getElementById('designation').value = savedDesig; 
+    }
   }
 
   function initProjectDropdown() {
     const projects = [...new Set(masterRoster.map(e => e.project))].filter(Boolean);
+    if (projects.length === 0) {
+      showProjectError("No projects found in roster sheet.");
+      return;
+    }
     populateSelect('project', projects, '-- Select Project --');
+    document.getElementById('project').disabled = false;
   }
 
   function onProjectChange(resetChildKeys = true) {
     const proj = document.getElementById('project').value;
     saveDropdownState('project', proj);
+    
     if (resetChildKeys) clearChildSelections(['organization', 'district', 'unionCouncil', 'fullName', 'designation']);
 
+    const orgSelect = document.getElementById('organization');
+    if (!proj) {
+      resetSelect('organization', '-- Select Project First --');
+      resetSelect('district', '-- Select Organization First --');
+      resetSelect('unionCouncil', '-- Select District First --');
+      resetSelect('fullName', '-- Select Union Council First --');
+      resetSelect('designation', '-- Select Full Name First --');
+      return;
+    }
+
     const filtered = masterRoster.filter(e => e.project === proj);
-    populateSelect('organization', [...new Set(filtered.map(e => e.organization))].filter(Boolean), '-- Select Organization --');
-    document.getElementById('organization').disabled = false;
+    const orgs = [...new Set(filtered.map(e => e.organization))].filter(Boolean);
+    populateSelect('organization', orgs, '-- Select Organization --');
+    orgSelect.disabled = orgs.length === 0;
   }
 
   function onOrganizationChange(resetChildKeys = true) {
     const proj = document.getElementById('project').value;
     const org = document.getElementById('organization').value;
     saveDropdownState('organization', org);
+    
     if (resetChildKeys) clearChildSelections(['district', 'unionCouncil', 'fullName', 'designation']);
 
+    const distSelect = document.getElementById('district');
+    if (!org) {
+      resetSelect('district', '-- Select Organization First --');
+      resetSelect('unionCouncil', '-- Select District First --');
+      resetSelect('fullName', '-- Select Union Council First --');
+      resetSelect('designation', '-- Select Full Name First --');
+      return;
+    }
+
     const filtered = masterRoster.filter(e => e.project === proj && e.organization === org);
-    populateSelect('district', [...new Set(filtered.map(e => e.district))].filter(Boolean), '-- Select District --');
-    document.getElementById('district').disabled = false;
+    const dists = [...new Set(filtered.map(e => e.district))].filter(Boolean);
+    populateSelect('district', dists, '-- Select District --');
+    distSelect.disabled = dists.length === 0;
   }
 
   function onDistrictChange(resetChildKeys = true) {
@@ -551,11 +596,21 @@
     const org = document.getElementById('organization').value;
     const dist = document.getElementById('district').value;
     saveDropdownState('district', dist);
+    
     if (resetChildKeys) clearChildSelections(['unionCouncil', 'fullName', 'designation']);
 
+    const ucSelect = document.getElementById('unionCouncil');
+    if (!dist) {
+      resetSelect('unionCouncil', '-- Select District First --');
+      resetSelect('fullName', '-- Select Union Council First --');
+      resetSelect('designation', '-- Select Full Name First --');
+      return;
+    }
+
     const filtered = masterRoster.filter(e => e.project === proj && e.organization === org && e.district === dist);
-    populateSelect('unionCouncil', [...new Set(filtered.map(e => e.unionCouncil))].filter(Boolean), '-- Select Union Council --');
-    document.getElementById('unionCouncil').disabled = false;
+    const ucs = [...new Set(filtered.map(e => e.unionCouncil))].filter(Boolean);
+    populateSelect('unionCouncil', ucs, '-- Select Union Council --');
+    ucSelect.disabled = ucs.length === 0;
   }
 
   function onUnionCouncilChange(resetChildKeys = true) {
@@ -564,11 +619,20 @@
     const dist = document.getElementById('district').value;
     const uc = document.getElementById('unionCouncil').value;
     saveDropdownState('unionCouncil', uc);
+    
     if (resetChildKeys) clearChildSelections(['fullName', 'designation']);
 
+    const nameSelect = document.getElementById('fullName');
+    if (!uc) {
+      resetSelect('fullName', '-- Select Union Council First --');
+      resetSelect('designation', '-- Select Full Name First --');
+      return;
+    }
+
     const filtered = masterRoster.filter(e => e.project === proj && e.organization === org && e.district === dist && e.unionCouncil === uc);
-    populateSelect('fullName', [...new Set(filtered.map(e => e.fullName))].filter(Boolean), '-- Select Full Name --');
-    document.getElementById('fullName').disabled = false;
+    const names = [...new Set(filtered.map(e => e.fullName))].filter(Boolean);
+    populateSelect('fullName', names, '-- Select Full Name --');
+    nameSelect.disabled = names.length === 0;
   }
 
   function onFullNameChange(resetChildKeys = true) {
@@ -579,21 +643,43 @@
     const name = document.getElementById('fullName').value;
     saveDropdownState('fullName', name);
 
+    if (resetChildKeys) clearChildSelections(['designation']);
+
+    const desigSelect = document.getElementById('designation');
+    if (!name) {
+      resetSelect('designation', '-- Select Full Name First --');
+      return;
+    }
+
     const filtered = masterRoster.filter(e => e.project === proj && e.organization === org && e.district === dist && e.unionCouncil === uc && e.fullName === name);
     const desigs = [...new Set(filtered.map(e => e.designation))].filter(Boolean);
     
     populateSelect('designation', desigs, '-- Select Designation --');
-    document.getElementById('designation').disabled = false;
+    desigSelect.disabled = desigs.length === 0;
 
     if (desigs.length === 1) {
-      document.getElementById('designation').value = desigs[0];
+      desigSelect.value = desigs[0];
       saveDropdownState('designation', desigs[0]);
     }
 
     fetchServerMonthSummary(name);
   }
 
-  function clearChildSelections(keys) { keys.forEach(k => localStorage.removeItem(`form_${k}`)); }
+  function clearChildSelections(keys) { 
+    keys.forEach(k => localStorage.removeItem(`form_${k}`)); 
+  }
+
+  function resetSelect(id, placeholder) {
+    const el = document.getElementById(id);
+    el.innerHTML = `<option value="">${placeholder}</option>`;
+    el.value = "";
+    el.disabled = true;
+  }
+
+  function populateSelect(id, items, placeholder) {
+    const el = document.getElementById(id);
+    el.innerHTML = `<option value="">${placeholder}</option>` + items.map(i => `<option value="${i}">${i}</option>`).join('');
+  }
 
   /* GPS & LEAFLET MAP */
   function fetchGPSLocation(forceRefresh = false) {
@@ -637,9 +723,7 @@
     try {
       map = L.map('mapContainer', { zoomControl: false }).setView([20.0, 0.0], 2);
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
-    } catch(e) {
-      console.log('Leaflet tile render note:', e);
-    }
+    } catch(e) {}
   }
 
   function updateMapMarker(lat, lng) {
@@ -649,7 +733,7 @@
     else mapMarker = L.marker([lat, lng]).addTo(map);
   }
 
-  /* AUTOMATED GMAIL APPLICATION GENERATOR */
+  /* AUTOMATED GMAIL LEAVE REQUEST */
   function triggerGmailLeaveRequest(record) {
     const dist = record.district;
     const distEmails = districtEmailsMap[dist] || {};
@@ -675,12 +759,9 @@
 
     const mailtoUrl = `mailto:${hrEmail}?cc=${encodeURIComponent(ccList)}&subject=${subject}&body=${encodeURIComponent(bodyText)}`;
     
-    setTimeout(() => {
-      window.location.href = mailtoUrl;
-    }, 600);
+    setTimeout(() => { window.location.href = mailtoUrl; }, 600);
   }
 
-  /* LOCAL CACHE & VALIDATION */
   function getTodayStr() {
     const d = new Date();
     const pad = n => String(n).padStart(2, '0');
@@ -703,7 +784,7 @@
     logs = logs.filter(r => {
       const isLeave = r.type && r.type.startsWith('Leave');
       if (isLeave) {
-        const dateParts = r.time.split(' ')[0].split('/');
+        const dateParts = (r.time || '').split(' ')[0].split('/');
         if (dateParts.length === 3) {
           const m = dateParts[1].padStart(2, '0');
           const y = dateParts[2];
@@ -711,7 +792,7 @@
         }
         return false;
       } else {
-        return r.time.startsWith(todayStr);
+        return (r.time || '').startsWith(todayStr);
       }
     });
 
@@ -728,12 +809,12 @@
 
   function validateLocally(record) {
     const todayStr = getTodayStr();
-    const logs = pruneLocalCache().filter(r => r.fullName.toLowerCase() === record.fullName.toLowerCase());
+    const logs = pruneLocalCache().filter(r => (r.fullName || '').toLowerCase() === (record.fullName || '').toLowerCase());
 
     if (record.type === 'Leave') {
       const leaveDates = record.leaveDates || [];
       for (let targetDate of leaveDates) {
-        const hasLeave = logs.some(r => r.time.startsWith(targetDate) && r.type.startsWith('Leave'));
+        const hasLeave = logs.some(r => (r.time || '').startsWith(targetDate) && r.type.startsWith('Leave'));
         if (hasLeave) {
           return { valid: false, title: "Leave Conflict", message: `Leave record already exists for ${record.fullName} on ${targetDate}.` };
         }
@@ -741,7 +822,7 @@
       return { valid: true };
     }
 
-    const todayLogs = logs.filter(r => r.time.startsWith(todayStr));
+    const todayLogs = logs.filter(r => (r.time || '').startsWith(todayStr));
     const hasLeaveToday = todayLogs.some(r => r.type.startsWith('Leave'));
     const hasCheckInToday = todayLogs.some(r => r.type === 'Check-In');
     const hasCheckOutToday = todayLogs.some(r => r.type === 'Check-Out');
@@ -843,11 +924,11 @@
       saveLocalLog(record);
     }
 
-    if (navigator.onLine && GAS_API_URL !== "YOUR_DEPLOYED_WEB_APP_URL_HERE") {
+    if (navigator.onLine && GAS_API_URL && !GAS_API_URL.includes("YOUR_DEPLOYED_WEB_APP_URL_HERE")) {
       sendToServerDirectly(record);
     } else {
       saveLocallyOffline(record);
-      showPopup("Saved Offline", "No active connection. Entry queued locally and will sync automatically when online.", "warning");
+      showPopup("Saved Offline", "No active connection or backend URL. Entry queued locally.", "warning");
       if (type === 'Leave') triggerGmailLeaveRequest(record);
       resetForm();
     }
@@ -860,6 +941,7 @@
 
     fetch(GAS_API_URL, {
       method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
       body: JSON.stringify({ action: 'submitAttendance', record: record })
     })
     .then(res => res.json())
@@ -869,7 +951,7 @@
       lucide.createIcons();
 
       if (res.status === 'SUCCESS' || res.status === 'SUCCESS_LEAVE') {
-        showPopup("Submitted Successfully", `Entry recorded for ${record.fullName}. Opening Gmail...`, "success");
+        showPopup("Submitted Successfully", `Entry recorded for ${record.fullName}.`, "success");
         if (record.type === 'Leave') triggerGmailLeaveRequest(record);
         resetForm();
       } else {
@@ -899,7 +981,7 @@
 
   async function syncOfflineQueue() {
     let queue = JSON.parse(localStorage.getItem('offline_attendance_queue') || '[]');
-    if (queue.length === 0 || GAS_API_URL === "YOUR_DEPLOYED_WEB_APP_URL_HERE") return;
+    if (queue.length === 0 || !GAS_API_URL || GAS_API_URL.includes("YOUR_DEPLOYED_WEB_APP_URL_HERE")) return;
 
     let remainingQueue = [];
     let syncedCount = 0;
@@ -908,6 +990,7 @@
       try {
         const response = await fetch(GAS_API_URL, {
           method: 'POST',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
           body: JSON.stringify({ action: 'submitAttendance', record: record })
         });
         const res = await response.json();
@@ -924,18 +1007,13 @@
   }
 
   function fetchServerMonthSummary(fullName) {
-    if (!navigator.onLine || GAS_API_URL === "YOUR_DEPLOYED_WEB_APP_URL_HERE") return;
+    if (!navigator.onLine || !GAS_API_URL || GAS_API_URL.includes("YOUR_DEPLOYED_WEB_APP_URL_HERE")) return;
 
     const todayStr = getTodayStr();
     const currentMY = getCurrentMonthYearStr();
 
-    fetch(GAS_API_URL, {
-      method: 'POST',
-      body: JSON.stringify({
-        action: 'getUserMonthSummary',
-        fullName: fullName,
-        monthYear: currentMY
-      })
+    fetch(`${GAS_API_URL}?action=getUserMonthSummary&fullName=${encodeURIComponent(fullName)}&monthYear=${encodeURIComponent(currentMY)}`, {
+      method: 'GET'
     })
     .then(res => res.json())
     .then(res => {
@@ -945,12 +1023,12 @@
         const validServerRecords = res.records.filter(r => {
           const isLeave = r.type && r.type.startsWith('Leave');
           if (isLeave) return true;
-          return r.time.startsWith(todayStr);
+          return (r.time || '').startsWith(todayStr);
         });
 
         validServerRecords.forEach(serverRec => {
           const exists = localLogs.some(l => 
-            l.fullName.toLowerCase() === serverRec.fullName.toLowerCase() && 
+            (l.fullName || '').toLowerCase() === (serverRec.fullName || '').toLowerCase() && 
             l.time === serverRec.time && 
             l.type === serverRec.type
           );
@@ -997,11 +1075,6 @@
     badge.className = queue.length > 0 ? "status-pill pill-queue active" : "status-pill pill-queue";
     badge.innerHTML = `<i data-lucide="refresh-cw" style="width: 13px; height: 13px;"></i> Queue: ${queue.length}`;
     lucide.createIcons();
-  }
-
-  function populateSelect(id, items, placeholder) {
-    const el = document.getElementById(id);
-    el.innerHTML = `<option value="">${placeholder}</option>` + items.map(i => `<option value="${i}">${i}</option>`).join('');
   }
 
   function resetForm() {

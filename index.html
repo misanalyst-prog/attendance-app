@@ -5,77 +5,411 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Attendance & Leave Portal</title>
   <link rel="manifest" href="./manifest.json">
-  <meta name="theme-color" content="#2563eb">
+  <meta name="theme-color" content="#4f46e5">
+  
+  <!-- Typography & Icons -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/lucide@latest"></script>
 
-  <script src="https://cdn.tailwindcss.com"></script>
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <!-- Component Libraries -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
 
   <style>
-    body { font-family: 'Plus Jakarta Sans', sans-serif; }
-    .leaflet-container { width: 100%; height: 100%; border-radius: 1rem; }
+    :root {
+      --bg-gradient: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+      --card-bg: rgba(255, 255, 255, 0.95);
+      --primary: #4f46e5;
+      --primary-hover: #4338ca;
+      --primary-light: #eef2ff;
+      --text-main: #0f172a;
+      --text-muted: #64748b;
+      --border-color: #e2e8f0;
+      --radius-xl: 24px;
+      --radius-lg: 16px;
+      --radius-md: 12px;
+      --shadow-ambient: 0 20px 25px -5px rgba(15, 23, 42, 0.05), 0 8px 10px -6px rgba(15, 23, 42, 0.02);
+      --shadow-glow: 0 10px 20px -5px rgba(79, 70, 229, 0.3);
+    }
+
+    body {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      background: var(--bg-gradient);
+      color: var(--text-main);
+      padding: 32px 16px;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .portal-wrapper {
+      width: 100%;
+      max-width: 480px;
+    }
+
+    /* TOP STATUS BAR */
+    .status-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+      padding: 8px 16px;
+      background: rgba(255, 255, 255, 0.7);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.8);
+      border-radius: 40px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.03);
+    }
+
+    .status-pill {
+      font-size: 0.75rem;
+      font-weight: 700;
+      padding: 6px 14px;
+      border-radius: 30px;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      letter-spacing: 0.02em;
+    }
+    
+    .pill-online { background: #dcfce7; color: #15803d; }
+    .pill-offline { background: #fef3c7; color: #b45309; }
+    .pill-queue { background: #f1f5f9; color: #475569; }
+    .pill-queue.active { background: #e0e7ff; color: #3730a3; font-weight: 800; }
+
+    .pulse-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background-color: currentColor;
+      animation: pulse 2s infinite;
+    }
+    @keyframes pulse {
+      0% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.4; transform: scale(1.2); }
+      100% { opacity: 1; transform: scale(1); }
+    }
+
+    /* CARD CONTAINER */
+    .portal-card {
+      background: var(--card-bg);
+      backdrop-filter: blur(16px);
+      border: 1px solid #ffffff;
+      border-radius: var(--radius-xl);
+      box-shadow: var(--shadow-ambient);
+      padding: 32px 28px;
+    }
+
+    .brand-header {
+      text-align: center;
+      margin-bottom: 28px;
+    }
+    .brand-icon {
+      width: 48px;
+      height: 48px;
+      background: var(--primary-light);
+      color: var(--primary);
+      border-radius: 16px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 12px;
+      box-shadow: 0 4px 12px rgba(79, 70, 229, 0.12);
+    }
+    .brand-header h1 {
+      font-size: 1.35rem;
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      color: var(--text-main);
+      margin: 0;
+    }
+    .brand-header p {
+      font-size: 0.83rem;
+      color: var(--text-muted);
+      margin-top: 4px;
+      font-weight: 500;
+    }
+
+    /* FORM ELEMENTS */
+    .form-group {
+      margin-bottom: 20px;
+    }
+
+    .form-label {
+      font-weight: 700;
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .form-control, .form-select {
+      border-radius: var(--radius-md);
+      border: 1.5px solid var(--border-color);
+      padding: 12px 16px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: var(--text-main);
+      background-color: #ffffff;
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .form-control:focus, .form-select:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.1);
+      outline: none;
+    }
+    .form-control:disabled, .form-select:disabled {
+      background-color: #f8fafc;
+      color: #94a3b8;
+      cursor: not-allowed;
+      border-color: #f1f5f9;
+    }
+
+    /* SEGMENTED TOGGLE SWITCH */
+    .segmented-picker {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      background: #f1f5f9;
+      padding: 5px;
+      border-radius: var(--radius-md);
+      gap: 4px;
+    }
+    .segmented-picker input[type="radio"] { display: none; }
+    .segmented-picker label {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      padding: 10px 8px;
+      font-weight: 700;
+      font-size: 0.82rem;
+      color: var(--text-muted);
+      border-radius: 10px;
+      cursor: pointer;
+      transition: all 0.25s ease;
+      margin: 0;
+    }
+    .segmented-picker input[type="radio"]:checked + label {
+      background: #ffffff;
+      color: var(--primary);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+    }
+    .segmented-picker input[id="typeLeave"]:checked + label {
+      color: #d97706;
+    }
+
+    .leave-panel {
+      background: #fffbeb;
+      border: 1.5px solid #fde68a;
+      border-radius: var(--radius-md);
+      padding: 18px;
+      margin-bottom: 20px;
+      display: none;
+      animation: fadeIn 0.3s ease;
+    }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: translateY(0); } }
+
+    /* MAP CONTAINER */
+    .map-box {
+      height: 140px;
+      border-radius: var(--radius-md);
+      border: 1.5px solid var(--border-color);
+      margin-top: 10px;
+      overflow: hidden;
+    }
+
+    .gps-refresh-btn {
+      background: var(--primary-light);
+      color: var(--primary);
+      border: none;
+      border-radius: 8px;
+      padding: 4px 10px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      transition: background 0.2s;
+    }
+    .gps-refresh-btn:hover { background: #e0e7ff; }
+
+    /* SUBMIT BUTTON */
+    .btn-submit {
+      background: var(--primary);
+      color: #ffffff;
+      border: none;
+      border-radius: var(--radius-md);
+      padding: 14px;
+      font-weight: 700;
+      font-size: 0.95rem;
+      width: 100%;
+      box-shadow: var(--shadow-glow);
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+    .btn-submit:hover {
+      background: var(--primary-hover);
+      transform: translateY(-1px);
+    }
+    .btn-submit:active { transform: translateY(0); }
+
+    /* POPUP MODAL */
+    .popup-overlay {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(15, 23, 42, 0.4);
+      backdrop-filter: blur(6px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 10000;
+      opacity: 0;
+      visibility: hidden;
+      transition: all 0.25s ease;
+      padding: 20px;
+    }
+    .popup-overlay.active { opacity: 1; visibility: visible; }
+    .popup-box {
+      background: #ffffff;
+      border-radius: var(--radius-xl);
+      max-width: 360px;
+      width: 100%;
+      padding: 28px 24px;
+      text-align: center;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+    }
+    .popup-icon-circle {
+      width: 52px; height: 52px;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      margin: 0 auto 16px auto;
+    }
+    .popup-error .popup-icon-circle { background: #fee2e2; color: #dc2626; }
+    .popup-warning .popup-icon-circle { background: #fef3c7; color: #b45309; }
+    .popup-success .popup-icon-circle { background: #dcfce7; color: #166534; }
+    
+    .popup-action-btn {
+      border: none;
+      border-radius: var(--radius-md);
+      padding: 12px;
+      font-weight: 700;
+      font-size: 0.9rem;
+      width: 100%;
+      margin-top: 20px;
+      transition: opacity 0.2s;
+    }
+    .popup-error .popup-action-btn { background: #dc2626; color: white; }
+    .popup-warning .popup-action-btn { background: #b45309; color: white; }
+    .popup-success .popup-action-btn { background: #166534; color: white; }
   </style>
 </head>
-<body class="bg-slate-100/80 text-slate-900 min-h-screen flex items-center justify-center p-3 sm:p-6">
+<body>
 
-  <!-- Mobile Container Frame -->
-  <div class="w-full max-w-md bg-white rounded-[32px] p-5 sm:p-6 shadow-xl shadow-slate-200/60 border border-slate-200/80 flex flex-col justify-between my-auto">
+<div class="portal-wrapper">
+  
+  <!-- NETWORK STATUS BAR -->
+  <div class="status-bar">
+    <span id="networkBadge" class="status-pill pill-online">
+      <span class="pulse-dot"></span> Online
+    </span>
+    <span id="queueBadge" class="status-pill pill-queue">
+      <i data-lucide="refresh-cw" style="width: 14px; height: 14px;"></i> Queue: 0
+    </span>
+  </div>
+
+  <!-- MAIN PORTAL CARD -->
+  <div class="portal-card">
     
-    <div>
-      <!-- Top Navigation & Status Bar -->
-      <div class="flex items-center justify-between pb-4 border-b border-slate-100 mb-5">
-        <div>
-          <span class="text-[11px] font-bold text-blue-600 uppercase tracking-wider">Verification Engine</span>
-          <h1 class="text-xl font-bold text-slate-900 mt-0.5">Attendance Portal</h1>
-        </div>
-        <div class="flex items-center gap-2">
-          <div id="queueBadge" class="hidden items-center text-[11px] font-semibold bg-amber-50 text-amber-700 border border-amber-200/60 px-2.5 py-1 rounded-full">
-            Sync: <span id="queueCount" class="ml-1 font-bold">0</span>
-          </div>
-          <div id="networkBadge" class="flex items-center gap-1.5 bg-emerald-50 border border-emerald-200/60 text-emerald-700 px-3 py-1 rounded-full text-xs font-semibold">
-            <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-            <span id="networkText">Online</span>
-          </div>
+    <div class="brand-header">
+      <div class="brand-icon">
+        <i data-lucide="user-check" style="width: 26px; height: 26px;"></i>
+      </div>
+      <h1>Attendance Portal</h1>
+      <p>Automated Verification Engine</p>
+    </div>
+
+    <form id="attendanceForm">
+      
+      <!-- EMAIL -->
+      <div class="form-group">
+        <label class="form-label"><i data-lucide="mail" style="width: 14px;"></i> Email Address</label>
+        <input type="email" id="userEmail" class="form-control" placeholder="name@organization.com" required onchange="localStorage.setItem('saved_user_email', this.value)">
+      </div>
+
+      <!-- ROSTER DROPDOWNS -->
+      <div class="form-group">
+        <label class="form-label"><i data-lucide="folder-kanban" style="width: 14px;"></i> Project</label>
+        <select id="project" class="form-select" onchange="onProjectChange()" required>
+          <option value="">-- Loading Projects --</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label"><i data-lucide="building-2" style="width: 14px;"></i> Organization</label>
+        <select id="organization" class="form-select" onchange="onOrganizationChange()" required disabled>
+          <option value="">-- Select Project First --</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label"><i data-lucide="map-pin" style="width: 14px;"></i> District</label>
+        <select id="district" class="form-select" onchange="onDistrictChange()" required disabled>
+          <option value="">-- Select Organization First --</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label"><i data-lucide="landmark" style="width: 14px;"></i> Union Council</label>
+        <select id="unionCouncil" class="form-select" onchange="onUnionCouncilChange()" required disabled>
+          <option value="">-- Select District First --</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label"><i data-lucide="user" style="width: 14px;"></i> Full Name</label>
+        <select id="fullName" class="form-select" onchange="onFullNameChange()" required disabled>
+          <option value="">-- Select Union Council First --</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label"><i data-lucide="briefcase" style="width: 14px;"></i> Designation</label>
+        <select id="designation" class="form-select" required disabled>
+          <option value="">-- Select Full Name First --</option>
+        </select>
+      </div>
+
+      <!-- SUBMISSION TYPE SELECTOR -->
+      <div class="form-group">
+        <label class="form-label"><i data-lucide="clock" style="width: 14px;"></i> Entry Type</label>
+        <div class="segmented-picker">
+          <input type="radio" name="type" id="typeIn" value="Check-In" checked onchange="toggleType()">
+          <label for="typeIn"><i data-lucide="log-in" style="width: 14px;"></i> In</label>
+          
+          <input type="radio" name="type" id="typeOut" value="Check-Out" onchange="toggleType()">
+          <label for="typeOut"><i data-lucide="log-out" style="width: 14px;"></i> Out</label>
+
+          <input type="radio" name="type" id="typeLeave" value="Leave" onchange="toggleType()">
+          <label for="typeLeave"><i data-lucide="calendar-off" style="width: 14px;"></i> Leave</label>
         </div>
       </div>
 
-      <!-- User Profile Header Card -->
-      <div class="bg-slate-50 border border-slate-200/60 rounded-2xl p-4 mb-5 relative">
-        <div class="flex items-center gap-3.5">
-          <div id="avatarInitials" class="w-12 h-12 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white font-bold text-base flex items-center justify-center shadow-md shadow-blue-500/20 shrink-0">
-            --
-          </div>
-          <div class="flex-1 min-w-0">
-            <h2 id="cardFullName" class="text-sm font-bold text-slate-900 truncate">Select Profile</h2>
-            <p id="cardEmail" class="text-xs text-slate-500 truncate">Tap Edit to configure profile</p>
-          </div>
-          <button type="button" onclick="openProfileModal()" class="text-xs font-semibold text-blue-600 bg-blue-50 hover:bg-blue-100/80 px-3 py-1.5 rounded-lg transition-colors shrink-0">
-            Edit
-          </button>
-        </div>
-        <div class="mt-3.5 pt-3 border-t border-slate-200/60 flex items-center justify-between text-xs text-slate-600">
-          <span id="cardDistrict" class="font-medium text-slate-500 truncate max-w-[45%]">No District</span>
-          <span class="text-slate-300">•</span>
-          <span id="cardProject" class="font-medium text-slate-500 truncate max-w-[45%]">No Project</span>
-        </div>
-      </div>
-
-      <!-- Segmented Submission Tabs -->
-      <div class="mb-5">
-        <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Submission Type</label>
-        <div class="grid grid-cols-3 gap-1 bg-slate-100 p-1.5 rounded-2xl border border-slate-200/50">
-          <button type="button" id="tabIn" onclick="selectType('Check-In')" class="py-2.5 text-xs font-semibold rounded-xl bg-white text-blue-600 shadow-sm transition-all">Check-In</button>
-          <button type="button" id="tabOut" onclick="selectType('Check-Out')" class="py-2.5 text-xs font-medium text-slate-600 hover:text-slate-900 transition-all">Check-Out</button>
-          <button type="button" id="tabLeave" onclick="selectType('Leave')" class="py-2.5 text-xs font-medium text-slate-600 hover:text-slate-900 transition-all">Leave</button>
-        </div>
-      </div>
-
-      <!-- Dynamic Leave Panel -->
-      <div id="leavePanel" class="hidden mb-5 p-4 bg-amber-50/60 border border-amber-200/60 rounded-2xl space-y-3">
-        <div>
-          <label class="block text-xs font-bold text-amber-900/70 uppercase tracking-wider mb-1">Leave Category</label>
-          <select id="leaveCategory" class="w-full px-3 py-2 text-xs font-medium bg-white border border-amber-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500/20">
+      <!-- LEAVE CONTAINER -->
+      <div id="leaveContainer" class="leave-panel">
+        <div class="mb-3">
+          <label class="form-label">Leave Category</label>
+          <select id="leaveCategory" class="form-select">
             <option value="Casual Leave">Casual Leave</option>
             <option value="Annual Leave">Annual Leave</option>
             <option value="Sick / Medical Leave">Sick / Medical Leave</option>
@@ -86,504 +420,570 @@
             <option value="Other">Other</option>
           </select>
         </div>
+
         <div>
-          <label class="block text-xs font-bold text-amber-900/70 uppercase tracking-wider mb-1">Select Date(s)</label>
-          <input type="text" id="leaveDatesPicker" placeholder="Tap to pick leave dates" class="w-full px-3 py-2 text-xs bg-white border border-amber-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500/20">
+          <label class="form-label">Select Date(s)</label>
+          <input type="text" id="leaveDatesPicker" class="form-control" placeholder="Tap to select dates">
         </div>
       </div>
 
-      <!-- Location Card & Verification -->
-      <div class="mb-5">
-        <div class="flex justify-between items-center mb-2">
-          <label class="text-xs font-bold text-slate-400 uppercase tracking-wider">GPS Verification</label>
-          <span id="liveClock" class="text-xs font-mono font-medium text-slate-500">--/--/---- • --:--:--</span>
-        </div>
+      <!-- TIME DISPLAY -->
+      <div class="form-group" id="timeContainer">
+        <label class="form-label"><i data-lucide="clock-3" style="width: 14px;"></i> Timestamp</label>
+        <input type="text" id="timeDisplay" class="form-control" readonly placeholder="Capturing system time...">
+      </div>
 
-        <div class="relative h-36 w-full rounded-2xl bg-slate-100 border border-slate-200/80 overflow-hidden">
-          <div id="map" class="w-full h-full"></div>
-          <div class="absolute bottom-2 left-1/2 -translate-x-1/2 z-[1000]">
-            <span id="gpsBadge" class="bg-white/95 backdrop-blur-sm px-3 py-1 rounded-full text-[11px] font-mono font-medium text-slate-700 shadow-sm border border-slate-200 flex items-center gap-1.5 whitespace-nowrap">
-              <span class="w-1.5 h-1.5 rounded-full bg-blue-600 animate-ping"></span>
-              Acquiring GPS...
-            </span>
-          </div>
-          <button type="button" onclick="fetchGPS(true)" class="absolute top-2 right-2 z-[1000] bg-white/90 backdrop-blur-sm p-1.5 rounded-lg shadow-sm border border-slate-200 text-slate-600 hover:text-blue-600 transition-colors">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+      <!-- GPS LOCATION -->
+      <div class="form-group">
+        <div class="d-flex justify-content-between align-items-center mb-1">
+          <label class="form-label mb-0"><i data-lucide="navigation" style="width: 14px;"></i> GPS Coordinates</label>
+          <button type="button" class="gps-refresh-btn" onclick="fetchGPSLocation(true)">
+            <i data-lucide="rotate-cw" style="width: 12px;"></i> Refresh
           </button>
         </div>
+        <input type="text" id="locationDisplay" class="form-control" readonly placeholder="Acquiring GPS position...">
+        <div id="mapContainer" class="map-box"></div>
       </div>
 
-      <!-- Remarks Input -->
-      <div class="mb-6">
-        <label for="notes" class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">Remarks <span class="text-slate-400 font-normal">(Optional)</span></label>
-        <input type="text" id="notes" placeholder="Add optional check-in notes..." class="w-full px-4 py-3 text-sm bg-slate-50 border border-slate-200/80 rounded-xl focus:outline-none focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-all placeholder:text-slate-400">
-      </div>
-    </div>
-
-    <!-- Confirm Submit Button -->
-    <button type="button" id="submitBtn" onclick="submitEntry()" class="w-full py-3.5 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-bold text-sm rounded-xl shadow-lg shadow-blue-600/25 transition-all flex items-center justify-center gap-2">
-      <span id="submitBtnText">Confirm Check-In</span>
-      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
-    </button>
-
-  </div>
-
-  <!-- Profile Configuration Modal -->
-  <div id="profileModal" class="fixed inset-0 z-[10000] bg-slate-900/40 backdrop-blur-sm hidden items-center justify-center p-4">
-    <div class="bg-white rounded-3xl max-w-sm w-full p-6 shadow-2xl border border-slate-100 max-h-[90vh] overflow-y-auto">
-      <div class="flex justify-between items-center pb-3 border-b border-slate-100 mb-4">
-        <h3 class="text-base font-bold text-slate-900">Configure Profile</h3>
-        <button type="button" onclick="closeProfileModal()" class="text-slate-400 hover:text-slate-600 text-lg font-bold">&times;</button>
+      <!-- REMARKS -->
+      <div class="form-group mb-4">
+        <label class="form-label"><i data-lucide="message-square" style="width: 14px;"></i> Remarks <span class="text-muted text-transform-none fw-normal">(Optional)</span></label>
+        <textarea id="remarks" class="form-control" rows="2" placeholder="Add optional notes..."></textarea>
       </div>
 
-      <form id="profileForm" class="space-y-3.5">
-        <div>
-          <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Email <span class="text-rose-500">*</span></label>
-          <input type="email" id="modalEmail" placeholder="name@org.com" required class="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-blue-600">
-        </div>
-        <div>
-          <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Project <span class="text-rose-500">*</span></label>
-          <select id="modalProject" onchange="onProjectChange()" required class="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-blue-600">
-            <option value="">-- Select Project --</option>
-          </select>
-        </div>
-        <div>
-          <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Organization <span class="text-rose-500">*</span></label>
-          <select id="modalOrg" onchange="onOrgChange()" disabled required class="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-blue-600">
-            <option value="">-- Select Org --</option>
-          </select>
-        </div>
-        <div>
-          <label class="block text-xs font-bold text-slate-500 uppercase mb-1">District <span class="text-rose-500">*</span></label>
-          <select id="modalDistrict" onchange="onDistrictChange()" disabled required class="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-blue-600">
-            <option value="">-- Select District --</option>
-          </select>
-        </div>
-        <div>
-          <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Union Council <span class="text-rose-500">*</span></label>
-          <select id="modalUC" onchange="onUCChange()" disabled required class="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-blue-600">
-            <option value="">-- Select UC --</option>
-          </select>
-        </div>
-        <div>
-          <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Full Name <span class="text-rose-500">*</span></label>
-          <select id="modalFullName" onchange="onFullNameChange()" disabled required class="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-blue-600">
-            <option value="">-- Select Name --</option>
-          </select>
-        </div>
-        <div>
-          <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Designation <span class="text-rose-500">*</span></label>
-          <select id="modalDesignation" disabled required class="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-blue-600">
-            <option value="">-- Select Designation --</option>
-          </select>
-        </div>
-
-        <button type="button" onclick="saveProfile()" class="w-full mt-2 py-3 bg-blue-600 text-white font-bold text-xs rounded-xl shadow-md hover:bg-blue-700 transition-colors">
-          Save Profile
-        </button>
-      </form>
-    </div>
+      <button type="submit" id="submitBtn" class="btn-submit">
+        <i data-lucide="send" style="width: 18px;"></i> Submit Attendance
+      </button>
+    </form>
   </div>
+</div>
 
-  <!-- Notification Modal -->
-  <div id="noticeModal" class="fixed inset-0 z-[10000] bg-slate-900/40 backdrop-blur-sm hidden items-center justify-center p-4">
-    <div class="bg-white rounded-3xl max-w-xs w-full p-5 text-center shadow-2xl border border-slate-100">
-      <div id="noticeIcon" class="w-10 h-10 rounded-full flex items-center justify-center mx-auto mb-3 font-bold text-lg">!</div>
-      <h4 id="noticeTitle" class="text-sm font-bold text-slate-900 mb-1">Notification</h4>
-      <p id="noticeMsg" class="text-xs text-slate-500 mb-4 leading-relaxed"></p>
-      <button type="button" onclick="closeNotice()" class="w-full py-2.5 bg-slate-900 text-white font-bold text-xs rounded-xl hover:bg-slate-800 transition-colors">Acknowledge</button>
+<!-- POPUP MODAL -->
+<div id="popupModal" class="popup-overlay popup-error">
+  <div class="popup-box">
+    <div id="popupIconCircle" class="popup-icon-circle">
+      <i id="popupIcon" data-lucide="alert-circle" style="width: 26px; height: 26px;"></i>
     </div>
+    <h6 id="popupTitle" class="fw-bold mb-2">Notice</h6>
+    <p id="popupMessage" class="text-muted small mb-0"></p>
+    <button type="button" class="popup-action-btn" onclick="closePopup()">Acknowledge</button>
   </div>
+</div>
 
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
 
-  <script>
-    const GAS_API_URL = "https://script.google.com/macros/s/AKfycbyLEMc5wnhuEbJXp7hP5Pmxhs4kKRU5LZABFqyd4ZnqJaWjJaVqUJhnqMFZPhXGUhFO-g/exec";
+<script>
+  const GAS_API_URL = "https://script.google.com/macros/s/AKfycbyLEMc5wnhuEbJXp7hP5Pmxhs4kKRU5LZABFqyd4ZnqJaWjJaVqUJhnqMFZPhXGUhFO-g/exec";
 
-    let activeType = "Check-In";
-    let masterRoster = [];
-    let map = null, mapMarker = null;
-    let flatpickrInst = null;
-    let currentGPSCoords = null;
+  let masterRoster = [];
+  let map = null, mapMarker = null;
+  let datePickerInstance = null;
 
-    window.addEventListener('load', () => {
-      if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('./sw.js').catch(() => {});
+  window.addEventListener('load', () => {
+    lucide.createIcons();
+
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('./sw.js')
+        .then(reg => console.log('Offline Engine Ready:', reg.scope))
+        .catch(err => console.log('Offline Engine Failed:', err));
+    }
+
+    const savedEmail = localStorage.getItem('saved_user_email');
+    if (savedEmail) document.getElementById('userEmail').value = savedEmail;
+
+    pruneLocalCache();
+    updateNetworkStatus();
+    initClock();
+    initLeafletMap();
+    initDatePicker();
+    fetchGPSLocation();
+    loadRosterData();
+    
+    if (navigator.onLine) syncOfflineQueue();
+  });
+
+  window.addEventListener('online', () => { updateNetworkStatus(); syncOfflineQueue(); });
+  window.addEventListener('offline', updateNetworkStatus);
+
+  /* GPS LOCATION */
+  function fetchGPSLocation(forceRefresh = false) {
+    const locInput = document.getElementById('locationDisplay');
+    locInput.value = "Acquiring GPS coordinates...";
+
+    if (!navigator.onLine && !forceRefresh) {
+      const cachedLoc = localStorage.getItem('cached_last_gps');
+      if (cachedLoc) {
+        locInput.value = cachedLoc;
+        const parts = cachedLoc.split(',');
+        if (parts.length === 2) updateMapMarker(parseFloat(parts[0]), parseFloat(parts[1]));
+        return;
       }
+    }
 
-      initClock();
-      initMap();
-      initDatePicker();
-      updateNetworkStatus();
-      loadSavedProfile();
-      loadRoster();
-      fetchGPS();
+    if (!("geolocation" in navigator)) {
+      locInput.value = "GPS Not Supported";
+      return;
+    }
 
-      if (navigator.onLine) syncQueue();
+    const geoOptions = {
+      enableHighAccuracy: true,
+      timeout: 15000,
+      maximumAge: forceRefresh ? 0 : 5000
+    };
+
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const lat = pos.coords.latitude.toFixed(6);
+        const lng = pos.coords.longitude.toFixed(6);
+        const formattedLoc = `${lat}, ${lng}`;
+        
+        locInput.value = formattedLoc;
+
+        localStorage.setItem('cached_last_gps', formattedLoc);
+        updateMapMarker(parseFloat(lat), parseFloat(lng));
+      },
+      (err) => {
+        const cachedLoc = localStorage.getItem('cached_last_gps');
+        if (cachedLoc) {
+          locInput.value = cachedLoc;
+        } else {
+          locInput.value = "GPS Access Denied";
+        }
+      },
+      geoOptions
+    );
+  }
+
+  function initLeafletMap() {
+    map = L.map('mapContainer', { zoomControl: false }).setView([20.0, 0.0], 2);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
+  }
+
+  function updateMapMarker(lat, lng) {
+    if (!map) return;
+    map.setView([lat, lng], 16);
+    if (mapMarker) mapMarker.setLatLng([lat, lng]);
+    else mapMarker = L.marker([lat, lng]).addTo(map);
+  }
+
+  /* LOCAL CACHE & VALIDATION RULES */
+  function getTodayStr() {
+    const d = new Date();
+    const pad = n => String(n).padStart(2, '0');
+    return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`;
+  }
+
+  function getCurrentMonthYearStr() {
+    const d = new Date();
+    const pad = n => String(n).padStart(2, '0');
+    return `${pad(d.getMonth() + 1)}/${d.getFullYear()}`;
+  }
+
+  function getLocalLogs() {
+    return JSON.parse(localStorage.getItem('user_attendance_logs') || '[]');
+  }
+
+  function pruneLocalCache() {
+    let logs = getLocalLogs();
+    const todayStr = getTodayStr();
+    const currentMY = getCurrentMonthYearStr();
+
+    logs = logs.filter(r => {
+      const isLeave = r.type && r.type.startsWith('Leave');
+      if (isLeave) {
+        const dateParts = r.time.split(' ')[0].split('/');
+        return dateParts.length === 3 && `${dateParts[1]}/${dateParts[2]}` === currentMY;
+      } else {
+        return r.time.startsWith(todayStr);
+      }
     });
 
-    window.addEventListener('online', () => { updateNetworkStatus(); syncQueue(); });
-    window.addEventListener('offline', updateNetworkStatus);
+    localStorage.setItem('user_attendance_logs', JSON.stringify(logs));
+    return logs;
+  }
 
-    /* LIVE CLOCK */
-    function initClock() {
-      setInterval(() => {
-        const d = new Date();
-        const pad = n => String(n).padStart(2, '0');
-        const formatted = `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()} • ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
-        document.getElementById('liveClock').textContent = formatted;
-      }, 1000);
+  function saveLocalLog(record) {
+    let logs = getLocalLogs();
+    logs.push(record);
+    localStorage.setItem('user_attendance_logs', JSON.stringify(logs));
+    pruneLocalCache();
+  }
+
+  function validateLocally(record) {
+    const todayStr = getTodayStr();
+    const logs = pruneLocalCache().filter(r => r.fullName.toLowerCase() === record.fullName.toLowerCase());
+
+    if (record.type === 'Leave') {
+      const leaveDates = record.leaveDates || [];
+      for (let targetDate of leaveDates) {
+        const hasLeave = logs.some(r => r.time.startsWith(targetDate) && r.type.startsWith('Leave'));
+        if (hasLeave) {
+          return { valid: false, title: "Leave Conflict", message: `Leave record already exists for ${record.fullName} on ${targetDate}.` };
+        }
+      }
+      return { valid: true };
     }
 
-    /* MAP & GPS ENGINE */
-    function initMap() {
-      map = L.map('map', { zoomControl: false, attributionControl: false }).setView([20.0, 0.0], 2);
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
+    const todayLogs = logs.filter(r => r.time.startsWith(todayStr));
+    const hasLeaveToday = todayLogs.some(r => r.type.startsWith('Leave'));
+    const hasCheckInToday = todayLogs.some(r => r.type === 'Check-In');
+    const hasCheckOutToday = todayLogs.some(r => r.type === 'Check-Out');
+
+    if (hasLeaveToday) {
+      return { valid: false, title: "Submission Blocked", message: `${record.fullName} is registered on Leave for today (${todayStr}).` };
     }
 
-    function fetchGPS(force = false) {
-      const badge = document.getElementById('gpsBadge');
-      if (!navigator.geolocation) {
-        badge.textContent = "GPS Not Supported";
+    if (record.type === 'Check-In') {
+      const now = new Date();
+      if (now.getHours() > 9 || (now.getHours() === 9 && (now.getMinutes() > 0 || now.getSeconds() > 0))) {
+        return { valid: false, title: "Check-In Window Closed", message: "Check-In time window closes strictly at 09:00 AM." };
+      }
+      if (hasCheckInToday) {
+        return { valid: false, title: "Already Checked-In", message: `${record.fullName} has already checked in for today (${todayStr}).` };
+      }
+    }
+
+    if (record.type === 'Check-Out') {
+      if (!hasCheckInToday) {
+        return { valid: false, title: "Check-Out Denied", message: `No Check-In record found for ${record.fullName} today (${todayStr}). You must Check-In first.` };
+      }
+      if (hasCheckOutToday) {
+        return { valid: false, title: "Already Checked-Out", message: `${record.fullName} has already checked out for today (${todayStr}).` };
+      }
+    }
+
+    return { valid: true };
+  }
+
+  /* FORM SUBMISSION */
+  document.getElementById('attendanceForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+
+    const email = document.getElementById('userEmail').value.trim();
+    const locVal = document.getElementById('locationDisplay').value;
+
+    if (!email) {
+      showPopup("Email Missing", "Please enter a valid email address.", "error");
+      return;
+    }
+
+    if (!locVal || locVal.includes("Acquiring") || locVal.includes("Denied") || locVal.includes("Supported")) {
+      showPopup("Location Error", "Please capture GPS coordinates before submitting.", "error");
+      return;
+    }
+
+    const type = document.querySelector('input[name="type"]:checked').value;
+    const proj = document.getElementById('project').value;
+    const org = document.getElementById('organization').value;
+    const dist = document.getElementById('district').value;
+    const uc = document.getElementById('unionCouncil').value;
+    const name = document.getElementById('fullName').value;
+    const desig = document.getElementById('designation').value;
+    const remarks = document.getElementById('remarks').value;
+    const currentTimeFormatted = document.getElementById('timeDisplay').value;
+
+    let record = {
+      uid: 'UID-' + Date.now(),
+      email: email,
+      project: proj,
+      organization: org,
+      district: dist,
+      unionCouncil: uc,
+      fullName: name,
+      designation: desig,
+      type: type,
+      time: currentTimeFormatted,
+      submissionTime: currentTimeFormatted,
+      location: locVal,
+      remarks: remarks
+    };
+
+    if (type === 'Leave') {
+      const selectedDatesStr = document.getElementById('leaveDatesPicker').value;
+      if (!selectedDatesStr) {
+        showPopup("Dates Required", "Please select leave date(s) on the calendar picker.", "warning");
         return;
       }
-
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          const lat = pos.coords.latitude.toFixed(6);
-          const lng = pos.coords.longitude.toFixed(6);
-          currentGPSCoords = `${lat}, ${lng}`;
-          badge.textContent = currentGPSCoords;
-
-          map.setView([lat, lng], 16);
-          if (mapMarker) mapMarker.setLatLng([lat, lng]);
-          else mapMarker = L.marker([lat, lng]).addTo(map);
-        },
-        () => {
-          badge.textContent = currentGPSCoords || "GPS Access Denied";
-        },
-        { enableHighAccuracy: true, timeout: 12000, maximumAge: force ? 0 : 5000 }
-      );
+      const leaveDates = selectedDatesStr.split(', ').map(d => d.trim());
+      record.leaveCategory = document.getElementById('leaveCategory').value;
+      record.leaveDates = leaveDates;
+      record.time = `${leaveDates[0]} 09:00:00`;
     }
 
-    /* SUBMISSION TYPE TOGGLE */
-    function selectType(type) {
-      activeType = type;
-      const tabs = { 'Check-In': 'tabIn', 'Check-Out': 'tabOut', 'Leave': 'tabLeave' };
-      
-      Object.keys(tabs).forEach(t => {
-        const el = document.getElementById(tabs[t]);
-        if (t === type) {
-          el.className = "py-2.5 text-xs font-semibold rounded-xl bg-white text-blue-600 shadow-sm transition-all";
-        } else {
-          el.className = "py-2.5 text-xs font-medium text-slate-600 hover:text-slate-900 transition-all";
-        }
+    const localCheck = validateLocally(record);
+    if (!localCheck.valid) {
+      showPopup(localCheck.title, localCheck.message, "error");
+      return;
+    }
+
+    if (type === 'Leave') {
+      record.leaveDates.forEach(d => {
+        saveLocalLog({ ...record, type: `Leave (${record.leaveCategory})`, time: `${d} 09:00:00` });
       });
+    } else {
+      saveLocalLog(record);
+    }
 
-      const leavePanel = document.getElementById('leavePanel');
-      const submitText = document.getElementById('submitBtnText');
-      if (type === 'Leave') {
-        leavePanel.classList.remove('hidden');
-        submitText.textContent = "Confirm Leave Request";
+    if (navigator.onLine && GAS_API_URL !== "YOUR_DEPLOYED_WEB_APP_URL_HERE") {
+      sendToServerDirectly(record);
+    } else {
+      saveLocallyOffline(record);
+      showPopup("Saved Offline", "No active connection. Entry queued locally and will sync automatically when online.", "warning");
+      resetForm();
+    }
+  });
+
+  function sendToServerDirectly(record) {
+    const btn = document.getElementById('submitBtn');
+    btn.disabled = true;
+    btn.innerHTML = `<span class="spinner-border spinner-border-sm" role="status"></span> Submitting...`;
+
+    fetch(GAS_API_URL, {
+      method: 'POST',
+      body: JSON.stringify({ action: 'submitAttendance', record: record })
+    })
+    .then(res => res.json())
+    .then(res => {
+      btn.disabled = false;
+      btn.innerHTML = `<i data-lucide="send" style="width: 18px;"></i> Submit Attendance`;
+      lucide.createIcons();
+
+      if (res.status === 'SUCCESS' || res.status === 'SUCCESS_LEAVE') {
+        showPopup("Submitted Successfully", `Entry recorded for ${record.fullName}.`, "success");
+        resetForm();
       } else {
-        leavePanel.classList.add('hidden');
-        submitText.textContent = `Confirm ${type}`;
+        saveLocallyOffline(record);
+        showPopup("Queued Offline", res.message || "Server issue encountered. Saved locally.", "warning");
+        resetForm();
+      }
+    })
+    .catch(() => {
+      btn.disabled = false;
+      btn.innerHTML = `<i data-lucide="send" style="width: 18px;"></i> Submit Attendance`;
+      lucide.createIcons();
+      saveLocallyOffline(record);
+      showPopup("Saved Offline", "Connection timeout. Queued locally for background sync.", "warning");
+      resetForm();
+    });
+  }
+
+  function saveLocallyOffline(record) {
+    let queue = JSON.parse(localStorage.getItem('offline_attendance_queue') || '[]');
+    queue.push(record);
+    localStorage.setItem('offline_attendance_queue', JSON.stringify(queue));
+    updateQueueBadge();
+  }
+
+  async function syncOfflineQueue() {
+    let queue = JSON.parse(localStorage.getItem('offline_attendance_queue') || '[]');
+    if (queue.length === 0 || GAS_API_URL === "YOUR_DEPLOYED_WEB_APP_URL_HERE") return;
+
+    let remainingQueue = [];
+    let syncedCount = 0;
+
+    for (const record of queue) {
+      try {
+        const response = await fetch(GAS_API_URL, {
+          method: 'POST',
+          body: JSON.stringify({ action: 'submitAttendance', record: record })
+        });
+        const res = await response.json();
+        if (res.status === 'SUCCESS' || res.status === 'SUCCESS_LEAVE') syncedCount++;
+        else remainingQueue.push(record);
+      } catch (err) {
+        remainingQueue.push(record);
       }
     }
 
-    /* PROFILE MANAGEMENT */
-    function loadSavedProfile() {
-      const prof = JSON.parse(localStorage.getItem('user_profile_cache') || '{}');
-      if (prof.fullName) {
-        document.getElementById('cardFullName').textContent = prof.fullName;
-        document.getElementById('cardEmail').textContent = prof.email || '';
-        document.getElementById('cardDistrict').textContent = prof.district || 'District';
-        document.getElementById('cardProject').textContent = prof.project || 'Project';
+    localStorage.setItem('offline_attendance_queue', JSON.stringify(remainingQueue));
+    updateQueueBadge();
+    if (syncedCount > 0) showPopup("Sync Complete", `${syncedCount} queued record(s) synced to Google Sheets.`, "success");
+  }
 
-        const initials = prof.fullName.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase();
-        document.getElementById('avatarInitials').textContent = initials;
-      }
-    }
+  function fetchServerMonthSummary(fullName) {
+    if (!navigator.onLine || GAS_API_URL === "YOUR_DEPLOYED_WEB_APP_URL_HERE") return;
 
-    function openProfileModal() {
-      document.getElementById('profileModal').classList.remove('hidden');
-      document.getElementById('profileModal').classList.add('flex');
-    }
-    function closeProfileModal() {
-      document.getElementById('profileModal').classList.add('hidden');
-      document.getElementById('profileModal').classList.remove('flex');
-    }
+    const todayStr = getTodayStr();
+    const currentMY = getCurrentMonthYearStr();
 
-    function saveProfile() {
-      const email = document.getElementById('modalEmail').value.trim();
-      const proj = document.getElementById('modalProject').value;
-      const org = document.getElementById('modalOrg').value;
-      const dist = document.getElementById('modalDistrict').value;
-      const uc = document.getElementById('modalUC').value;
-      const name = document.getElementById('modalFullName').value;
-      const desig = document.getElementById('modalDesignation').value;
-
-      if (!email || !proj || !org || !dist || !uc || !name || !desig) {
-        showNotice("Incomplete Profile", "Please fill in all profile fields.", "error");
-        return;
-      }
-
-      const prof = { email, project: proj, organization: org, district: dist, unionCouncil: uc, fullName: name, designation: desig };
-      localStorage.setItem('user_profile_cache', JSON.stringify(prof));
-      loadSavedProfile();
-      closeProfileModal();
-      showNotice("Profile Saved", "Your roster details have been updated.", "success");
-    }
-
-    /* ROSTER CASCADE DROPDOWNS */
-    function loadRoster() {
-      const cached = localStorage.getItem('employee_roster_cache');
-      if (cached) { masterRoster = JSON.parse(cached); initProjectDropdown(); }
-
-      if (navigator.onLine && GAS_API_URL !== "YOUR_DEPLOYED_WEB_APP_URL_HERE") {
-        fetch(GAS_API_URL, { method: 'POST', body: JSON.stringify({ action: 'getEmployees' }) })
-          .then(r => r.json())
-          .then(res => {
-            if (res.status === 'SUCCESS' && res.employees) {
-              masterRoster = res.employees;
-              localStorage.setItem('employee_roster_cache', JSON.stringify(masterRoster));
-              initProjectDropdown();
-            }
-          }).catch(() => {});
-      }
-    }
-
-    function initProjectDropdown() {
-      const projs = [...new Set(masterRoster.map(e => e.project))].filter(Boolean);
-      populateSelect('modalProject', projs, '-- Select Project --');
-    }
-
-    function onProjectChange() {
-      const proj = document.getElementById('modalProject').value;
-      const filtered = masterRoster.filter(e => e.project === proj);
-      populateSelect('modalOrg', [...new Set(filtered.map(e => e.organization))].filter(Boolean), '-- Select Org --');
-      document.getElementById('modalOrg').disabled = false;
-    }
-
-    function onOrgChange() {
-      const proj = document.getElementById('modalProject').value;
-      const org = document.getElementById('modalOrg').value;
-      const filtered = masterRoster.filter(e => e.project === proj && e.organization === org);
-      populateSelect('modalDistrict', [...new Set(filtered.map(e => e.district))].filter(Boolean), '-- Select District --');
-      document.getElementById('modalDistrict').disabled = false;
-    }
-
-    function onDistrictChange() {
-      const proj = document.getElementById('modalProject').value;
-      const org = document.getElementById('modalOrg').value;
-      const dist = document.getElementById('modalDistrict').value;
-      const filtered = masterRoster.filter(e => e.project === proj && e.organization === org && e.district === dist);
-      populateSelect('modalUC', [...new Set(filtered.map(e => e.unionCouncil))].filter(Boolean), '-- Select UC --');
-      document.getElementById('modalUC').disabled = false;
-    }
-
-    function onUCChange() {
-      const proj = document.getElementById('modalProject').value;
-      const org = document.getElementById('modalOrg').value;
-      const dist = document.getElementById('modalDistrict').value;
-      const uc = document.getElementById('modalUC').value;
-      const filtered = masterRoster.filter(e => e.project === proj && e.organization === org && e.district === dist && e.unionCouncil === uc);
-      populateSelect('modalFullName', [...new Set(filtered.map(e => e.fullName))].filter(Boolean), '-- Select Name --');
-      document.getElementById('modalFullName').disabled = false;
-    }
-
-    function onFullNameChange() {
-      const proj = document.getElementById('modalProject').value;
-      const org = document.getElementById('modalOrg').value;
-      const dist = document.getElementById('modalDistrict').value;
-      const uc = document.getElementById('modalUC').value;
-      const name = document.getElementById('modalFullName').value;
-      const filtered = masterRoster.filter(e => e.project === proj && e.organization === org && e.district === dist && e.unionCouncil === uc && e.fullName === name);
-      const desigs = [...new Set(filtered.map(e => e.designation))].filter(Boolean);
-      populateSelect('modalDesignation', desigs, '-- Select Designation --');
-      document.getElementById('modalDesignation').disabled = false;
-      if (desigs.length === 1) document.getElementById('modalDesignation').value = desigs[0];
-    }
-
-    function populateSelect(id, items, placeholder) {
-      const el = document.getElementById(id);
-      el.innerHTML = `<option value="">${placeholder}</option>` + items.map(i => `<option value="${i}">${i}</option>`).join('');
-    }
-
-    /* SUBMISSION HANDLER */
-    function submitEntry() {
-      const prof = JSON.parse(localStorage.getItem('user_profile_cache') || '{}');
-      if (!prof.fullName) {
-        openProfileModal();
-        showNotice("Profile Required", "Please configure your profile details first.", "error");
-        return;
-      }
-
-      if (!currentGPSCoords) {
-        showNotice("Location Required", "Acquiring GPS location. Please wait a moment.", "error");
-        fetchGPS(true);
-        return;
-      }
-
-      const timeText = document.getElementById('liveClock').textContent.replace(' • ', ' ');
-      const remarks = document.getElementById('notes').value.trim();
-
-      let record = {
-        uid: 'UID-' + Date.now(),
-        email: prof.email,
-        project: prof.project,
-        organization: prof.organization,
-        district: prof.district,
-        unionCouncil: prof.unionCouncil,
-        fullName: prof.fullName,
-        designation: prof.designation,
-        type: activeType,
-        time: timeText,
-        location: currentGPSCoords,
-        remarks: remarks
-      };
-
-      if (activeType === 'Leave') {
-        const datesStr = document.getElementById('leaveDatesPicker').value;
-        if (!datesStr) {
-          showNotice("Dates Missing", "Please select leave date(s).", "error");
-          return;
-        }
-        const dates = datesStr.split(', ').map(d => d.trim());
-        record.leaveCategory = document.getElementById('leaveCategory').value;
-        record.leaveDates = dates;
-        record.time = `${dates[0]} 09:00:00`;
-      }
-
-      if (navigator.onLine && GAS_API_URL !== "YOUR_DEPLOYED_WEB_APP_URL_HERE") {
-        sendToServer(record);
-      } else {
-        queueOffline(record);
-        showNotice("Saved Offline", "No internet connection. Entry queued locally.", "warning");
-        document.getElementById('notes').value = '';
-      }
-    }
-
-    function sendToServer(record) {
-      const btn = document.getElementById('submitBtn');
-      btn.disabled = true;
-      document.getElementById('submitBtnText').textContent = "Submitting...";
-
-      fetch(GAS_API_URL, {
-        method: 'POST',
-        body: JSON.stringify({ action: 'submitAttendance', record: record })
+    fetch(GAS_API_URL, {
+      method: 'POST',
+      body: JSON.stringify({
+        action: 'getUserMonthSummary',
+        fullName: fullName,
+        monthYear: currentMY
       })
-      .then(r => r.json())
+    })
+    .then(res => res.json())
+    .then(res => {
+      if (res.status === 'SUCCESS' && Array.isArray(res.records)) {
+        let localLogs = getLocalLogs();
+
+        const validServerRecords = res.records.filter(r => {
+          const isLeave = r.type && r.type.startsWith('Leave');
+          if (isLeave) return true;
+          return r.time.startsWith(todayStr);
+        });
+
+        validServerRecords.forEach(serverRec => {
+          const exists = localLogs.some(l => 
+            l.fullName.toLowerCase() === serverRec.fullName.toLowerCase() && 
+            l.time === serverRec.time && 
+            l.type === serverRec.type
+          );
+          if (!exists) localLogs.push(serverRec);
+        });
+
+        localStorage.setItem('user_attendance_logs', JSON.stringify(localLogs));
+        pruneLocalCache();
+      }
+    })
+    .catch(() => {});
+  }
+
+  /* DROPDOWN & ROSTER CASCADE LOGIC */
+  function loadRosterData() {
+    const cached = localStorage.getItem('employee_roster_cache');
+    if (cached) { masterRoster = JSON.parse(cached); initProjectDropdown(); }
+
+    if (navigator.onLine && GAS_API_URL !== "YOUR_DEPLOYED_WEB_APP_URL_HERE") {
+      fetch(GAS_API_URL, { method: 'POST', body: JSON.stringify({ action: 'getEmployees' }) })
+      .then(res => res.json())
       .then(res => {
-        btn.disabled = false;
-        selectType(activeType);
-
-        if (res.status === 'SUCCESS' || res.status === 'SUCCESS_LEAVE') {
-          showNotice("Success", `Attendance recorded for ${record.fullName}.`, "success");
-          document.getElementById('notes').value = '';
-        } else {
-          queueOffline(record);
-          showNotice("Queued Offline", res.message || "Server issue. Saved locally.", "warning");
+        if (res.status === 'SUCCESS' && res.employees) {
+          masterRoster = res.employees;
+          localStorage.setItem('employee_roster_cache', JSON.stringify(masterRoster));
+          initProjectDropdown();
         }
-      })
-      .catch(() => {
-        btn.disabled = false;
-        selectType(activeType);
-        queueOffline(record);
-        showNotice("Saved Offline", "Connection issue. Saved locally for background sync.", "warning");
-      });
+      }).catch(() => {});
     }
+  }
 
-    function queueOffline(record) {
-      let queue = JSON.parse(localStorage.getItem('offline_attendance_queue') || '[]');
-      queue.push(record);
-      localStorage.setItem('offline_attendance_queue', JSON.stringify(queue));
-      updateNetworkStatus();
-    }
+  function initProjectDropdown() {
+    const projects = [...new Set(masterRoster.map(e => e.project))].filter(Boolean);
+    populateSelect('project', projects, '-- Select Project --');
+  }
 
-    async function syncQueue() {
-      let queue = JSON.parse(localStorage.getItem('offline_attendance_queue') || '[]');
-      if (queue.length === 0 || GAS_API_URL === "YOUR_DEPLOYED_WEB_APP_URL_HERE") return;
+  function onProjectChange() {
+    const proj = document.getElementById('project').value;
+    const filtered = masterRoster.filter(e => e.project === proj);
+    populateSelect('organization', [...new Set(filtered.map(e => e.organization))].filter(Boolean), '-- Select Organization --');
+    document.getElementById('organization').disabled = false;
+  }
 
-      let remaining = [];
-      let synced = 0;
+  function onOrganizationChange() {
+    const proj = document.getElementById('project').value;
+    const org = document.getElementById('organization').value;
+    const filtered = masterRoster.filter(e => e.project === proj && e.organization === org);
+    populateSelect('district', [...new Set(filtered.map(e => e.district))].filter(Boolean), '-- Select District --');
+    document.getElementById('district').disabled = false;
+  }
 
-      for (const rec of queue) {
-        try {
-          const res = await fetch(GAS_API_URL, {
-            method: 'POST',
-            body: JSON.stringify({ action: 'submitAttendance', record: rec })
-          }).then(r => r.json());
+  function onDistrictChange() {
+    const proj = document.getElementById('project').value;
+    const org = document.getElementById('organization').value;
+    const dist = document.getElementById('district').value;
+    const filtered = masterRoster.filter(e => e.project === proj && e.organization === org && e.district === dist);
+    populateSelect('unionCouncil', [...new Set(filtered.map(e => e.unionCouncil))].filter(Boolean), '-- Select Union Council --');
+    document.getElementById('unionCouncil').disabled = false;
+  }
 
-          if (res.status === 'SUCCESS' || res.status === 'SUCCESS_LEAVE') synced++;
-          else remaining.push(rec);
-        } catch (e) {
-          remaining.push(rec);
-        }
-      }
+  function onUnionCouncilChange() {
+    const proj = document.getElementById('project').value;
+    const org = document.getElementById('organization').value;
+    const dist = document.getElementById('district').value;
+    const uc = document.getElementById('unionCouncil').value;
+    const filtered = masterRoster.filter(e => e.project === proj && e.organization === org && e.district === dist && e.unionCouncil === uc);
+    populateSelect('fullName', [...new Set(filtered.map(e => e.fullName))].filter(Boolean), '-- Select Full Name --');
+    document.getElementById('fullName').disabled = false;
+  }
 
-      localStorage.setItem('offline_attendance_queue', JSON.stringify(remaining));
-      updateNetworkStatus();
-      if (synced > 0) showNotice("Synced", `${synced} offline entry(s) pushed to Google Sheets.`, "success");
-    }
+  function onFullNameChange() {
+    const proj = document.getElementById('project').value;
+    const org = document.getElementById('organization').value;
+    const dist = document.getElementById('district').value;
+    const uc = document.getElementById('unionCouncil').value;
+    const name = document.getElementById('fullName').value;
 
-    /* UI UTILITIES */
-    function initDatePicker() {
-      flatpickrInst = flatpickr("#leaveDatesPicker", { mode: "multiple", dateFormat: "d/m/Y", conjunction: ", ", minDate: "today" });
-    }
+    const filtered = masterRoster.filter(e => e.project === proj && e.organization === org && e.district === dist && e.unionCouncil === uc && e.fullName === name);
+    const desigs = [...new Set(filtered.map(e => e.designation))].filter(Boolean);
+    
+    populateSelect('designation', desigs, '-- Select Designation --');
+    document.getElementById('designation').disabled = false;
+    if (desigs.length === 1) document.getElementById('designation').value = desigs[0];
 
-    function updateNetworkStatus() {
-      const badge = document.getElementById('networkBadge');
-      const text = document.getElementById('networkText');
-      const queueBadge = document.getElementById('queueBadge');
-      const queueCount = document.getElementById('queueCount');
+    fetchServerMonthSummary(name);
+  }
 
-      const queue = JSON.parse(localStorage.getItem('offline_attendance_queue') || '[]');
+  /* HELPERS & UI CONTROLS */
+  function initDatePicker() {
+    datePickerInstance = flatpickr("#leaveDatesPicker", {
+      mode: "multiple", dateFormat: "d/m/Y", conjunction: ", ", minDate: "today"
+    });
+  }
 
-      if (navigator.onLine) {
-        badge.className = "flex items-center gap-1.5 bg-emerald-50 border border-emerald-200/60 text-emerald-700 px-3 py-1 rounded-full text-xs font-semibold";
-        text.textContent = "Online";
-      } else {
-        badge.className = "flex items-center gap-1.5 bg-amber-50 border border-amber-200/60 text-amber-700 px-3 py-1 rounded-full text-xs font-semibold";
-        text.textContent = "Offline";
-      }
+  function toggleType() {
+    const isLeave = document.getElementById('typeLeave').checked;
+    document.getElementById('leaveContainer').style.display = isLeave ? 'block' : 'none';
+    document.getElementById('timeContainer').style.display = isLeave ? 'none' : 'block';
+  }
 
-      if (queue.length > 0) {
-        queueBadge.classList.remove('hidden');
-        queueBadge.classList.add('flex');
-        queueCount.textContent = queue.length;
-      } else {
-        queueBadge.classList.add('hidden');
-        queueBadge.classList.remove('flex');
-      }
-    }
+  function initClock() {
+    setInterval(() => {
+      const d = new Date();
+      const pad = n => String(n).padStart(2, '0');
+      document.getElementById('timeDisplay').value = `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+    }, 1000);
+  }
 
-    function showNotice(title, msg, type = "error") {
-      const modal = document.getElementById('noticeModal');
-      const icon = document.getElementById('noticeIcon');
-      document.getElementById('noticeTitle').textContent = title;
-      document.getElementById('noticeMsg').textContent = msg;
+  function updateNetworkStatus() {
+    const statusEl = document.getElementById('networkBadge');
+    statusEl.className = navigator.onLine ? "status-pill pill-online" : "status-pill pill-offline";
+    statusEl.innerHTML = navigator.onLine ? `<span class="pulse-dot"></span> Online` : `<span class="pulse-dot"></span> Offline`;
+    updateQueueBadge();
+  }
 
-      if (type === "success") {
-        icon.className = "w-10 h-10 rounded-full flex items-center justify-center mx-auto mb-3 font-bold text-lg bg-emerald-100 text-emerald-700";
-        icon.textContent = "✓";
-      } else if (type === "warning") {
-        icon.className = "w-10 h-10 rounded-full flex items-center justify-center mx-auto mb-3 font-bold text-lg bg-amber-100 text-amber-700";
-        icon.textContent = "!";
-      } else {
-        icon.className = "w-10 h-10 rounded-full flex items-center justify-center mx-auto mb-3 font-bold text-lg bg-rose-100 text-rose-700";
-        icon.textContent = "✕";
-      }
+  function updateQueueBadge() {
+    const queue = JSON.parse(localStorage.getItem('offline_attendance_queue') || '[]');
+    const badge = document.getElementById('queueBadge');
+    badge.className = queue.length > 0 ? "status-pill pill-queue active" : "status-pill pill-queue";
+    badge.innerHTML = `<i data-lucide="refresh-cw" style="width: 14px;"></i> Queue: ${queue.length}`;
+    lucide.createIcons();
+  }
 
-      modal.classList.remove('hidden');
-      modal.classList.add('flex');
-    }
+  function populateSelect(id, items, placeholder) {
+    const el = document.getElementById(id);
+    el.innerHTML = `<option value="">${placeholder}</option>` + items.map(i => `<option value="${i}">${i}</option>`).join('');
+  }
 
-    function closeNotice() {
-      document.getElementById('noticeModal').classList.add('hidden');
-      document.getElementById('noticeModal').classList.remove('flex');
-    }
-  </script>
+  function resetForm() {
+    const currentEmail = document.getElementById('userEmail').value;
+    document.getElementById('attendanceForm').reset();
+    document.getElementById('userEmail').value = currentEmail;
+    document.getElementById('typeIn').checked = true;
+    toggleType();
+    if (datePickerInstance) datePickerInstance.clear();
+    initProjectDropdown();
+    fetchGPSLocation();
+  }
+
+  function showPopup(title, message, type = "error") {
+    const modal = document.getElementById('popupModal');
+    document.getElementById('popupTitle').textContent = title;
+    document.getElementById('popupMessage').textContent = message;
+    modal.className = `popup-overlay popup-${type} active`;
+
+    const iconEl = document.getElementById('popupIcon');
+    if (type === "success") iconEl.setAttribute('data-lucide', 'check-circle-2');
+    else if (type === "warning") iconEl.setAttribute('data-lucide', 'alert-triangle');
+    else iconEl.setAttribute('data-lucide', 'alert-circle');
+    
+    lucide.createIcons();
+  }
+
+  function closePopup() { document.getElementById('popupModal').classList.remove('active'); }
+</script>
 </body>
-</html>
+</html>  

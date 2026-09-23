@@ -417,10 +417,8 @@
     initDatePicker();
     fetchGPSLocation();
     
-    // Load roster data from local storage first; update from server if online
     loadRosterData();
     
-    // Check for offline sync queue on page load
     if (navigator.onLine) {
       syncOfflineQueue();
     }
@@ -428,6 +426,7 @@
 
   window.addEventListener('online', () => {
     updateNetworkStatus();
+    isTimeTamperedOffline = false; // Reset tamper flag on reconnect
     syncOfflineQueue();
   });
 
@@ -438,7 +437,7 @@
       mode: "multiple",
       dateFormat: "d/m/Y",
       conjunction: ", ",
-      minDate: "today" // Restricts users from picking past dates
+      minDate: "today"
     });
   }
 
@@ -456,7 +455,6 @@
     }
   }
 
-  // --- OFFLINE & REAL-TIME CLOCK / TAMPER CHECK ---
   function initClock() {
     updateClock();
     setInterval(updateClock, 1000);
@@ -466,7 +464,6 @@
     const now = Date.now();
     const lastSeen = parseInt(localStorage.getItem('sys_last_seen_time') || '0', 10);
 
-    // Detect if phone clock was manually moved backward by more than 30 seconds
     if (lastSeen > 0 && now < lastSeen - 30000) {
       isTimeTamperedOffline = true;
     } else {
@@ -503,7 +500,9 @@
         if (mapMarker) mapMarker.setLatLng(latLng);
         else mapMarker = L.marker(latLng).addTo(map);
       },
-      () => { locInput.value = "GPS Access Denied / Unavailable"; },
+      (err) => { 
+        locInput.value = "GPS Access Denied / Tap Refresh";
+      },
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
     );
   }
@@ -522,18 +521,15 @@
     badge.textContent = `Sync Queue: ${queue.length}`;
   }
 
-  // --- DROPDOWN ROSTER CACHING (FIRST-LOAD LOCAL STORAGE) ---
   function loadRosterData() {
     const cachedRoster = localStorage.getItem('employee_roster_cache');
     
     if (cachedRoster) {
-      // Instant render from local storage
       masterRoster = JSON.parse(cachedRoster);
       initProjectDropdown();
     }
 
-    // Refresh roster from server when online
-    if (navigator.onLine) {
+    if (navigator.onLine && GAS_API_URL !== "YOUR_DEPLOYED_WEB_APP_URL_HERE") {
       fetch(GAS_API_URL, {
         method: 'POST',
         body: JSON.stringify({ action: 'getEmployees' })
@@ -546,15 +542,17 @@
           initProjectDropdown();
         }
       })
-      .catch(() => {
-        // Retain existing cached roster if fetch fails
-      });
+      .catch(() => {});
     }
   }
 
   function initProjectDropdown() {
+    const currentVal = document.getElementById('project').value;
     const projects = [...new Set(masterRoster.map(e => e.project))].filter(Boolean);
     populateSelect('project', projects, '-- Select Project --');
+    if (currentVal && projects.includes(currentVal)) {
+      document.getElementById('project').value = currentVal;
+    }
   }
 
   function onProjectChange() {
@@ -562,6 +560,7 @@
     const filtered = masterRoster.filter(e => e.project === proj);
     populateSelect('organization', [...new Set(filtered.map(e => e.organization))].filter(Boolean), '-- Select Organization --');
     document.getElementById('organization').disabled = false;
+    resetChildDropdowns(['district', 'unionCouncil', 'fullName', 'designation']);
   }
 
   function onOrganizationChange() {
@@ -570,6 +569,7 @@
     const filtered = masterRoster.filter(e => e.project === proj && e.organization === org);
     populateSelect('district', [...new Set(filtered.map(e => e.district))].filter(Boolean), '-- Select District --');
     document.getElementById('district').disabled = false;
+    resetChildDropdowns(['unionCouncil', 'fullName', 'designation']);
   }
 
   function onDistrictChange() {
@@ -579,6 +579,7 @@
     const filtered = masterRoster.filter(e => e.project === proj && e.organization === org && e.district === dist);
     populateSelect('unionCouncil', [...new Set(filtered.map(e => e.unionCouncil))].filter(Boolean), '-- Select Union Council --');
     document.getElementById('unionCouncil').disabled = false;
+    resetChildDropdowns(['fullName', 'designation']);
   }
 
   function onUnionCouncilChange() {
@@ -589,6 +590,7 @@
     const filtered = masterRoster.filter(e => e.project === proj && e.organization === org && e.district === dist && e.unionCouncil === uc);
     populateSelect('fullName', [...new Set(filtered.map(e => e.fullName))].filter(Boolean), '-- Select Full Name --');
     document.getElementById('fullName').disabled = false;
+    resetChildDropdowns(['designation']);
   }
 
   function onFullNameChange() {
@@ -609,7 +611,14 @@
     el.innerHTML = `<option value="">${placeholder}</option>` + items.map(i => `<option value="${i}">${i}</option>`).join('');
   }
 
-  // --- FORM SUBMISSION LOGIC ---
+  function resetChildDropdowns(ids) {
+    ids.forEach(id => {
+      const el = document.getElementById(id);
+      el.innerHTML = `<option value="">-- Select Parent First --</option>`;
+      el.disabled = true;
+    });
+  }
+
   document.getElementById('attendanceForm').addEventListener('submit', function(e) {
     e.preventDefault();
 
@@ -664,11 +673,9 @@
       record.time = `${leaveDates[0]} 09:00:00`;
     }
 
-    // IF ONLINE: Send directly to server without storing locally
     if (navigator.onLine) {
       sendToServerDirectly(record);
     } else {
-      // IF OFFLINE: Queue locally in localStorage
       saveLocallyOffline(record);
       showPopup("Saved Offline", "No internet connection detected. Record queued locally and will sync automatically when online.", "warning");
       resetForm();
@@ -703,7 +710,6 @@
       else if (res.status === 'VALIDATION_FAILED') {
         showPopup("Notice", res.message, "error");
       } else {
-        // Network or execution issue fallback: queue offline
         saveLocallyOffline(record);
         showPopup("Queued Offline", "Server warning received. Record queued locally for retry.", "warning");
         resetForm();
@@ -713,7 +719,6 @@
       btn.disabled = false;
       btn.textContent = "Submit Request";
       
-      // If network drops mid-request, switch to offline storage safely
       saveLocallyOffline(record);
       showPopup("Saved Offline", "Connection interrupted. Record queued locally and will sync when reconnected.", "warning");
       resetForm();
@@ -727,7 +732,6 @@
     updateQueueBadge();
   }
 
-  // --- AUTOMATIC BACKGROUND SYNC WHEN CONNECTED ---
   async function syncOfflineQueue() {
     let queue = JSON.parse(localStorage.getItem('offline_attendance_queue') || '[]');
     if (queue.length === 0) return;
@@ -753,7 +757,6 @@
       }
     }
 
-    // Update queue storage with remaining unsynced items
     localStorage.setItem('offline_attendance_queue', JSON.stringify(remainingQueue));
     updateQueueBadge();
 

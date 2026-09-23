@@ -1,4 +1,4 @@
-const CACHE_NAME = 'attendance-v9';
+const CACHE_NAME = 'attendance-v10';
 
 const ASSETS_TO_CACHE = [
   './',
@@ -46,13 +46,10 @@ self.addEventListener('fetch', (event) => {
   event.respondWith(
     caches.match(event.request).then((cachedResponse) => {
       if (cachedResponse) {
-        // Return cached asset immediately
         return cachedResponse;
       }
 
-      // If not in cache, fetch from network and cache for future offline access
       return fetch(event.request).then((networkResponse) => {
-        // Accept valid responses (200) and opaque CDN responses (type === 'opaque' / status 0)
         if (
           networkResponse &&
           (networkResponse.status === 200 || networkResponse.type === 'opaque')

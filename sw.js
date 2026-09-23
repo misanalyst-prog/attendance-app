@@ -1,88 +1,50 @@
-const CACHE_NAME = 'attendance-v19';
-
-// Static assets & external dependencies required for offline execution
-const PRECACHE_ASSETS = [
+const CACHE_NAME = 'attendance-v20';
+const STATIC_ASSETS = [
   './',
   './index.html',
   './manifest.json',
-  // External Styles & Typography
-  'https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap',
   'https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css',
-  'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css',
-  'https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css',
-  // External JavaScript Libraries
-  'https://unpkg.com/lucide@latest',
   'https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js',
+  'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css',
   'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js',
-  'https://cdn.jsdelivr.net/npm/flatpickr'
+  'https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css',
+  'https://cdn.jsdelivr.net/npm/flatpickr',
+  'https://unpkg.com/lucide@latest'
 ];
 
-/* 1. INSTALL EVENT: Pre-cache static assets */
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME)
-      .then((cache) => {
-        console.log('[Service Worker] Pre-caching offline assets');
-        return cache.addAll(PRECACHE_ASSETS);
-      })
+    caches.open(CACHE_NAME).then((cache) => cache.addAll(STATIC_ASSETS))
       .then(() => self.skipWaiting())
   );
 });
 
-/* 2. ACTIVATE EVENT: Clean up outdated cache versions */
 self.addEventListener('activate', (event) => {
   event.waitUntil(
-    caches.keys().then((cacheNames) => {
-      return Promise.all(
-        cacheNames.map((cache) => {
-          if (cache !== CACHE_NAME) {
-            console.log('[Service Worker] Removing old cache version:', cache);
-            return caches.delete(cache);
-          }
-        })
-      );
-    }).then(() => self.clients.claim())
+    caches.keys().then((keys) => 
+      Promise.all(keys.map((k) => k !== CACHE_NAME && caches.delete(k)))
+    ).then(() => self.clients.claim())
   );
 });
 
-/* 3. FETCH EVENT: Stale-While-Revalidate Strategy */
 self.addEventListener('fetch', (event) => {
-  // Ignore non-GET requests (e.g., POST API requests handled by application queue)
-  if (event.request.method !== 'GET') return;
+  // Always bypass cache for Google Apps Script requests
+  if (event.request.url.includes('script.google.com') || event.request.method !== 'GET') {
+    event.respondWith(fetch(event.request));
+    return;
+  }
 
   event.respondWith(
-    caches.match(event.request).then((cachedResponse) => {
-      if (cachedResponse) {
-        // Refresh cache in background
-        fetch(event.request)
-          .then((networkResponse) => {
-            if (networkResponse && networkResponse.status === 200) {
-              caches.open(CACHE_NAME).then((cache) => cache.put(event.request, networkResponse));
-            }
-          })
-          .catch(() => /* Offline fetch silent catch */ {});
-
-        return cachedResponse;
+    caches.match(event.request).then((cached) => {
+      if (cached) {
+        fetch(event.request).then((networkRes) => {
+          if (networkRes && networkRes.status === 200) {
+            caches.open(CACHE_NAME).then((c) => c.put(event.request, networkRes));
+          }
+        }).catch(() => {});
+        return cached;
       }
-
-      return fetch(event.request)
-        .then((networkResponse) => {
-          if (!networkResponse || networkResponse.status !== 200) {
-            return networkResponse;
-          }
-
-          const responseToCache = networkResponse.clone();
-          caches.open(CACHE_NAME).then((cache) => {
-            cache.put(event.request, responseToCache);
-          });
-
-          return networkResponse;
-        })
-        .catch(() => {
-          if (event.request.mode === 'navigate') {
-            return caches.match('./index.html');
-          }
-        });
+      return fetch(event.request);
     })
   );
 });

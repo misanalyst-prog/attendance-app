@@ -342,7 +342,7 @@
 
         <div class="mb-0">
           <label class="form-label">Select Leave Date(s) <span class="text-danger">*</span></label>
-          <input type="text" id="leaveDatesPicker" class="form-control" placeholder="Tap to select dates (Multiple selection enabled)">
+          <input type="text" id="leaveDatesPicker" class="form-control" placeholder="Tap to select dates">
         </div>
       </div>
 
@@ -392,7 +392,6 @@
 <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
 
 <script>
-  // INSERT YOUR GOOGLE APPS SCRIPT WEB APP URL HERE
   const GAS_API_URL = "https://script.google.com/macros/s/AKfycbyLEMc5wnhuEbJXp7hP5Pmxhs4kKRU5LZABFqyd4ZnqJaWjJaVqUJhnqMFZPhXGUhFO-g/exec";
 
   let masterRoster = [];
@@ -426,7 +425,7 @@
 
   window.addEventListener('online', () => {
     updateNetworkStatus();
-    isTimeTamperedOffline = false; // Reset tamper flag on reconnect
+    isTimeTamperedOffline = false;
     syncOfflineQueue();
   });
 
@@ -437,8 +436,47 @@
       mode: "multiple",
       dateFormat: "d/m/Y",
       conjunction: ", ",
-      minDate: "today"
+      minDate: "today",
+      onChange: function(selectedDates, dateStr, instance) {
+        if (dateStr) verifyLeaveAvailability();
+      }
     });
+  }
+
+  function verifyLeaveAvailability() {
+    const fullName = document.getElementById('fullName').value;
+    const dateStr = document.getElementById('leaveDatesPicker').value;
+
+    if (!fullName) {
+      showPopup("Select Employee First", "Please select Full Name before choosing leave dates.", "warning");
+      if (datePickerInstance) datePickerInstance.clear();
+      return;
+    }
+
+    if (!dateStr || !navigator.onLine) return;
+
+    const dates = dateStr.split(', ').map(d => d.trim());
+
+    fetch(GAS_API_URL, {
+      method: 'POST',
+      body: JSON.stringify({
+        action: 'checkLeaveStatus',
+        fullName: fullName,
+        dates: dates
+      })
+    })
+    .then(res => res.json())
+    .then(res => {
+      if (res.status === 'SUCCESS' && res.exists) {
+        showPopup(
+          "Leave Already Submitted", 
+          `A leave record already exists for ${fullName} on: (${res.duplicateDates.join(', ')}). Date selection cleared.`, 
+          "warning"
+        );
+        if (datePickerInstance) datePickerInstance.clear();
+      }
+    })
+    .catch(() => {});
   }
 
   function toggleAttendanceType() {
@@ -604,6 +642,10 @@
     populateSelect('designation', desigs, '-- Select Designation --');
     document.getElementById('designation').disabled = false;
     if (desigs.length === 1) document.getElementById('designation').value = desigs[0];
+
+    if (document.getElementById('typeLeave').checked && document.getElementById('leaveDatesPicker').value) {
+      verifyLeaveAvailability();
+    }
   }
 
   function populateSelect(id, items, placeholder) {
@@ -627,6 +669,18 @@
       return;
     }
 
+    const type = document.querySelector('input[name="type"]:checked').value;
+    const currentTimeFormatted = document.getElementById('timeDisplay').value;
+
+    // FRONTEND PRE-CHECK 1: Check-In 9:00 AM cutoff
+    if (type === 'Check-In') {
+      const now = new Date();
+      if (now.getHours() > 9 || (now.getHours() === 9 && (now.getMinutes() > 0 || now.getSeconds() > 0))) {
+        showPopup("Check-In Denied", "Check-In time window closes strictly at 9:00 AM.", "error");
+        return;
+      }
+    }
+
     const email = document.getElementById('userEmail').value.trim();
     const locVal = document.getElementById('locationDisplay').value;
 
@@ -641,9 +695,7 @@
     const uc = document.getElementById('unionCouncil').value;
     const name = document.getElementById('fullName').value;
     const desig = document.getElementById('designation').value;
-    const type = document.querySelector('input[name="type"]:checked').value;
     const remarks = document.getElementById('remarks').value;
-    const currentTimeFormatted = document.getElementById('timeDisplay').value;
 
     let record = {
       uid: 'UID-' + Date.now(),
@@ -704,8 +756,8 @@
         showPopup("Leave Submitted", res.message, "success");
         resetForm();
       }
-      else if (res.status === 'DUPLICATE_LEAVE') {
-        showPopup("Duplicate Leave", res.message, "warning");
+      else if (res.status === 'LEAVE_ALREADY_EXISTS') {
+        showPopup("Leave Already Submitted", res.message, "warning");
       }
       else if (res.status === 'VALIDATION_FAILED') {
         showPopup("Notice", res.message, "error");
@@ -747,7 +799,7 @@
         });
         const res = await response.json();
         
-        if (res.status === 'SUCCESS' || res.status === 'SUCCESS_LEAVE' || res.status === 'DUPLICATE_LEAVE' || res.status === 'VALIDATION_FAILED') {
+        if (res.status === 'SUCCESS' || res.status === 'SUCCESS_LEAVE' || res.status === 'LEAVE_ALREADY_EXISTS' || res.status === 'VALIDATION_FAILED') {
           syncedCount++;
         } else {
           remainingQueue.push(record);

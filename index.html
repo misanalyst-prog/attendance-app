@@ -8,11 +8,12 @@
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
 
-  <title>Attendance Portal</title>
+  <title>Attendance & Leave Portal</title>
   <link rel="manifest" href="manifest.json">
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
 
   <meta name="theme-color" content="#2563eb">
 
@@ -111,16 +112,8 @@
       background-color: var(--readonly-bg);
       color: #475569;
       font-weight: 500;
-      cursor: not-allowed;
     }
 
-    .form-select:disabled {
-      background-color: var(--readonly-bg);
-      opacity: 0.65;
-      cursor: not-allowed;
-    }
-
-    /* SEGMENTED CONTROL & YELLOW LEAVE BUTTON */
     .segmented-control {
       display: flex;
       background-color: #f1f5f9;
@@ -130,9 +123,7 @@
       gap: 4px;
     }
 
-    .segmented-control input[type="radio"] {
-      display: none;
-    }
+    .segmented-control input[type="radio"] { display: none; }
 
     .segmented-control label {
       flex: 1;
@@ -153,12 +144,23 @@
       box-shadow: 0 2px 8px rgba(37, 99, 235, 0.25);
     }
 
-    /* YELLOW STYLING FOR LEAVE BUTTON WHEN SELECTED */
+    /* YELLOW LEAVE BUTTON STYLING */
     .segmented-control input[id="typeLeave"]:checked + label {
       background-color: #eab308 !important;
       color: #0f172a !important;
       box-shadow: 0 2px 8px rgba(234, 179, 8, 0.35) !important;
     }
+
+    .leave-panel {
+      background-color: #fefce8;
+      border: 1.5px solid #fef08a;
+      border-radius: 14px;
+      padding: 16px;
+      margin-bottom: 16px;
+      display: none;
+    }
+
+    .leave-panel.active { display: block; }
 
     .btn-refresh-icon {
       background: #f1f5f9;
@@ -171,26 +173,15 @@
       align-items: center;
       justify-content: center;
       cursor: pointer;
-      transition: all 0.2s ease;
       padding: 0;
     }
 
-    .btn-refresh-icon:hover {
-      background: #e2e8f0;
-      color: var(--primary);
-    }
-
-    .btn-refresh-icon:active svg {
-      transform: rotate(180deg);
-    }
-
     #mapContainer {
-      height: 170px;
+      height: 160px;
       border-radius: 14px;
       border: 1.5px solid var(--border-color);
       margin-bottom: 1rem;
       overflow: hidden;
-      z-index: 1;
     }
 
     .btn-submit {
@@ -202,10 +193,6 @@
       font-size: 0.98rem;
       color: #ffffff;
       transition: background-color 0.2s ease;
-    }
-
-    .btn-submit:hover {
-      background-color: var(--primary-hover);
     }
 
     .popup-backdrop {
@@ -264,8 +251,8 @@
 
   <div class="card-custom">
     <div class="text-center mb-4">
-      <h5 class="fw-bold m-0" style="color: var(--text-main);">Attendance Portal</h5>
-      <p class="text-muted small m-0 mt-1">Automatic Location & Time Synchronization</p>
+      <h5 class="fw-bold m-0" style="color: var(--text-main);">Attendance & Leave Portal</h5>
+      <p class="text-muted small m-0 mt-1">Multi-Date Leave & Location Sync</p>
     </div>
 
     <form id="attendanceForm">
@@ -324,23 +311,45 @@
         </select>
       </div>
 
-      <!-- Attendance Type with Yellow Leave -->
+      <!-- Attendance Type -->
       <div class="mb-3">
         <label class="form-label d-block">Attendance Type <span class="text-danger">*</span></label>
         <div class="segmented-control">
-          <input type="radio" name="type" id="typeIn" value="Check-In" checked>
+          <input type="radio" name="type" id="typeIn" value="Check-In" checked onchange="toggleAttendanceType()">
           <label for="typeIn">Check-In</label>
           
-          <input type="radio" name="type" id="typeOut" value="Check-Out">
+          <input type="radio" name="type" id="typeOut" value="Check-Out" onchange="toggleAttendanceType()">
           <label for="typeOut">Check-Out</label>
 
-          <input type="radio" name="type" id="typeLeave" value="Leave">
+          <input type="radio" name="type" id="typeLeave" value="Leave" onchange="toggleAttendanceType()">
           <label for="typeLeave">Leave</label>
         </div>
       </div>
 
-      <!-- Current Time -->
-      <div class="mb-3">
+      <!-- LEAVE OPTIONS PANEL (DYNAMICALLY SHOWN ON LEAVE SELECTION) -->
+      <div id="leavePanel" class="leave-panel">
+        <div class="mb-3">
+          <label class="form-label">Leave Category <span class="text-danger">*</span></label>
+          <select id="leaveCategory" class="form-select">
+            <option value="Casual Leave">Casual Leave</option>
+            <option value="Annual Leave">Annual Leave</option>
+            <option value="Sick / Medical Leave">Sick / Medical Leave</option>
+            <option value="Maternity Leave">Maternity Leave</option>
+            <option value="Paternity Leave">Paternity Leave</option>
+            <option value="Compassionate / Bereavement Leave">Compassionate / Bereavement Leave</option>
+            <option value="Unpaid / Without Pay Leave">Unpaid / Without Pay Leave</option>
+            <option value="Other">Other</option>
+          </select>
+        </div>
+
+        <div class="mb-0">
+          <label class="form-label">Select Leave Date(s) <span class="text-danger">*</span></label>
+          <input type="text" id="leaveDatesPicker" class="form-control" placeholder="Tap to select dates (Multiple selection enabled)">
+        </div>
+      </div>
+
+      <!-- Current Time Display (For Check-In / Check-Out) -->
+      <div class="mb-3" id="timeFieldContainer">
         <label class="form-label">Current Date & Time</label>
         <input type="text" id="timeDisplay" class="form-control" readonly placeholder="Capturing time...">
       </div>
@@ -367,7 +376,7 @@
         <textarea id="remarks" class="form-control" rows="2" placeholder="Write any optional notes..."></textarea>
       </div>
 
-      <button type="submit" id="submitBtn" class="btn btn-submit w-100">Submit Attendance</button>
+      <button type="submit" id="submitBtn" class="btn btn-submit w-100">Submit Request</button>
     </form>
   </div>
 </div>
@@ -382,65 +391,69 @@
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
 
 <script>
   // INSERT YOUR DEPLOYED GOOGLE APPS SCRIPT URL HERE
-  const GAS_API_URL = "https://script.google.com/macros/s/AKfycbyLEMc5wnhuEbJXp7hP5Pmxhs4kKRU5LZABFqyd4ZnqJaWjJaVqUJhnqMFZPhXGUhFO-g/exec";
+  const GAS_API_URL = "YOUR_DEPLOYED_WEB_APP_URL_HERE";
 
   let masterRoster = [];
   let map = null;
   let mapMarker = null;
   let capturedLat = null;
   let capturedLng = null;
+  let datePickerInstance = null;
 
-  // Monotonic time trackers for offline time-tampering detection
+  // Time tampering trackers
   let basePerfTime = performance.now();
   let baseRealTime = Date.now();
   let maxObservedTime = Number(localStorage.getItem('max_observed_timestamp') || Date.now());
 
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('./sw.js').then(reg => {
-      reg.update();
-      reg.onupdatefound = () => {
-        const installingWorker = reg.installing;
-        installingWorker.onstatechange = () => {
-          if (installingWorker.state === 'installed' && navigator.serviceWorker.controller) {
-            window.location.reload();
-          }
-        };
-      };
-    });
-
-    let refreshing = false;
-    navigator.serviceWorker.addEventListener('controllerchange', () => {
-      if (!refreshing) {
-        refreshing = true;
-        window.location.reload();
-      }
-    });
+    navigator.serviceWorker.register('./sw.js').then(reg => reg.update());
   }
 
   window.addEventListener('load', () => {
-    // Restore saved user email
     const savedEmail = localStorage.getItem('saved_user_email');
-    if (savedEmail) {
-      document.getElementById('userEmail').value = savedEmail;
-    }
+    if (savedEmail) document.getElementById('userEmail').value = savedEmail;
 
     updateNetworkStatus();
     initClock();
     initLeafletMap();
+    initDatePicker();
     fetchGPSLocation();
     loadRosterData();
   });
 
-  // INSTANT AUTO-SYNC WHEN CONNECTING TO INTERNET (NO REFRESH REQUIRED)
   window.addEventListener('online', () => {
     updateNetworkStatus();
-    syncOfflineQueue(); // Immediately executes sync on reconnection
+    syncOfflineQueue(); // Automatic sync on reconnect
   });
 
   window.addEventListener('offline', updateNetworkStatus);
+
+  function initDatePicker() {
+    datePickerInstance = flatpickr("#leaveDatesPicker", {
+      mode: "multiple",
+      dateFormat: "d/m/Y",
+      minDate: "today",
+      conjunction: ", "
+    });
+  }
+
+  function toggleAttendanceType() {
+    const isLeave = document.getElementById('typeLeave').checked;
+    const leavePanel = document.getElementById('leavePanel');
+    const timeContainer = document.getElementById('timeFieldContainer');
+
+    if (isLeave) {
+      leavePanel.classList.add('active');
+      timeContainer.style.display = 'none';
+    } else {
+      leavePanel.classList.remove('active');
+      timeContainer.style.display = 'block';
+    }
+  }
 
   function initClock() {
     updateClock();
@@ -454,76 +467,47 @@
     document.getElementById('timeDisplay').value = formatted;
   }
 
-  // OFFLINE TIME TAMPERING DETECTION ENGINE
   function isTimeTamperedOffline() {
     const now = Date.now();
-
-    // 1. Clock setting back detection
-    if (now < maxObservedTime - 60000) {
-      return true;
-    }
-
+    if (now < maxObservedTime - 60000) return true;
     if (now > maxObservedTime) {
       localStorage.setItem('max_observed_timestamp', String(now));
       maxObservedTime = now;
     }
-
-    // 2. Hardware clock vs System time drift check
     const perfElapsed = (performance.now() - basePerfTime) / 1000;
     const realElapsed = (now - baseRealTime) / 1000;
-
-    if (Math.abs(realElapsed - perfElapsed) > 120) { // Time jump > 2 mins
-      return true;
-    }
-
-    return false;
+    return Math.abs(realElapsed - perfElapsed) > 120;
   }
 
-  // OFFLINE CHECK-IN / CHECK-OUT / LEAVE VALIDATION ENGINE
   function checkOfflineValidation(record) {
     const localLogs = JSON.parse(localStorage.getItem('local_today_logs') || '[]');
-    const recordDate = record.time.split(' ')[0];
-
-    const todayUserLogs = localLogs.filter(item => 
-      item.fullName.trim().toLowerCase() === record.fullName.trim().toLowerCase() && 
-      item.time.split(' ')[0] === recordDate
-    );
-
-    const hasCheckIn = todayUserLogs.some(item => item.type === 'Check-In');
-    const hasCheckOut = todayUserLogs.some(item => item.type === 'Check-Out');
-    const hasLeave = todayUserLogs.some(item => item.type === 'Leave');
-
+    
     if (record.type === 'Leave') {
-      if (hasLeave || hasCheckIn || hasCheckOut) {
-        return { valid: false, message: `Leave Denied: Attendance or leave record already exists for ${record.fullName} today (${recordDate}).` };
-      }
-    }
+      const leaveDates = record.leaveDates || [];
+      const duplicateFound = leaveDates.some(dateStr => {
+        return localLogs.some(item => 
+          item.fullName.trim().toLowerCase() === record.fullName.trim().toLowerCase() && 
+          item.time.includes(dateStr)
+        );
+      });
 
-    if (record.type === 'Check-In') {
-      if (hasLeave) {
-        return { valid: false, message: `Check-In Denied: Leave has already been recorded for ${record.fullName} today (${recordDate}).` };
+      if (duplicateFound) {
+        return { valid: false, message: "Leave Denied: You have already recorded leave for one or more of the selected dates locally." };
       }
-      if (hasCheckIn) {
-        return { valid: false, message: `Check-In Denied: ${record.fullName} has already checked in today (${recordDate}).` };
-      }
+    } else {
+      const recordDate = record.time.split(' ')[0];
+      const todayLogs = localLogs.filter(item => 
+        item.fullName.trim().toLowerCase() === record.fullName.trim().toLowerCase() && 
+        item.time.split(' ')[0] === recordDate
+      );
 
-      // Offline 9:00 AM check-in cut-off rule
-      const now = new Date();
-      if (now.getHours() > 9 || (now.getHours() === 9 && now.getMinutes() > 0)) {
-        return { valid: false, message: "Check-In Denied: Check-In is strictly closed after 9:00 AM." };
-      }
-    }
+      const hasCheckIn = todayLogs.some(i => i.type === 'Check-In');
+      const hasCheckOut = todayLogs.some(i => i.type === 'Check-Out');
+      const hasLeave = todayLogs.some(i => i.type.startsWith('Leave'));
 
-    if (record.type === 'Check-Out') {
-      if (hasLeave) {
-        return { valid: false, message: `Check-Out Denied: Leave has already been recorded for ${record.fullName} today (${recordDate}).` };
-      }
-      if (!hasCheckIn) {
-        return { valid: false, message: `Check-Out Denied: ${record.fullName} has not checked in today (${recordDate}).` };
-      }
-      if (hasCheckOut) {
-        return { valid: false, message: `Check-Out Denied: ${record.fullName} has already checked out today (${recordDate}).` };
-      }
+      if (hasLeave) return { valid: false, message: `Submission Blocked: Leave already logged for ${recordDate}.` };
+      if (record.type === 'Check-In' && hasCheckIn) return { valid: false, message: `Check-In Denied: Already checked in for ${recordDate}.` };
+      if (record.type === 'Check-Out' && (!hasCheckIn || hasCheckOut)) return { valid: false, message: `Check-Out Denied: Invalid check-out request.` };
     }
 
     return { valid: true };
@@ -536,8 +520,8 @@
   }
 
   function initLeafletMap() {
-    map = L.map('mapContainer', { zoomControl: true, dragging: true, scrollWheelZoom: false }).setView([20.0, 0.0], 2);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap' }).addTo(map);
+    map = L.map('mapContainer', { zoomControl: true, dragging: true }).setView([20.0, 0.0], 2);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
   }
 
   function fetchGPSLocation() {
@@ -551,76 +535,46 @@
 
     navigator.geolocation.getCurrentPosition(
       (position) => {
-        if (position.coords.accuracy > 1500) {
-          locInput.value = "Location Tampering Detected / Mock GPS";
-          showPopup("GPS Warning", "Mock GPS or inaccurate location detected. Please enable high-accuracy real GPS.", "error");
-          return;
-        }
-
         capturedLat = position.coords.latitude.toFixed(6);
         capturedLng = position.coords.longitude.toFixed(6);
         locInput.value = `${capturedLat}, ${capturedLng}`;
-
         const latLng = [parseFloat(capturedLat), parseFloat(capturedLng)];
         map.setView(latLng, 16);
-
         if (mapMarker) mapMarker.setLatLng(latLng);
         else mapMarker = L.marker(latLng).addTo(map);
       },
-      () => {
-        locInput.value = "GPS Access Denied / Unavailable";
-        showPopup("GPS Required", "Please enable GPS location permissions.", "error");
-      },
+      () => { locInput.value = "GPS Access Denied / Unavailable"; },
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
     );
   }
 
   function updateNetworkStatus() {
     const statusEl = document.getElementById('networkStatus');
-    if (navigator.onLine) {
-      statusEl.className = "chip-badge chip-online";
-      statusEl.textContent = "● Online";
-    } else {
-      statusEl.className = "chip-badge chip-offline";
-      statusEl.textContent = "● Offline";
-    }
+    statusEl.className = navigator.onLine ? "chip-badge chip-online" : "chip-badge chip-offline";
+    statusEl.textContent = navigator.onLine ? "● Online" : "● Offline";
     updateQueueBadge();
   }
 
   function updateQueueBadge() {
     const queue = JSON.parse(localStorage.getItem('offline_attendance_queue') || '[]');
     const badge = document.getElementById('queueStatus');
-    const count = queue.length;
-
-    if (count > 0) {
-      badge.className = "chip-badge chip-sync has-pending";
-      badge.textContent = `Sync Queue: ${count} Pending`;
-    } else {
-      badge.className = "chip-badge chip-sync";
-      badge.textContent = `Sync Queue: 0`;
-    }
+    badge.className = queue.length > 0 ? "chip-badge chip-sync has-pending" : "chip-badge chip-sync";
+    badge.textContent = `Sync Queue: ${queue.length}`;
   }
 
   function loadRosterData() {
     if (navigator.onLine) {
-      fetch(GAS_API_URL, {
-        method: 'POST',
-        body: JSON.stringify({ action: 'getEmployees' })
-      })
+      fetch(GAS_API_URL, { method: 'POST', body: JSON.stringify({ action: 'getEmployees' }) })
       .then(res => res.json())
       .then(res => {
         if (res.status === 'SUCCESS' && res.employees) {
           masterRoster = res.employees;
           localStorage.setItem('employee_roster_cache', JSON.stringify(masterRoster));
           initProjectDropdown();
-        } else {
-          loadRosterFromCache();
-        }
+        } else { loadRosterFromCache(); }
       })
       .catch(() => loadRosterFromCache());
-    } else {
-      loadRosterFromCache();
-    }
+    } else { loadRosterFromCache(); }
   }
 
   function loadRosterFromCache() {
@@ -634,46 +588,30 @@
   function initProjectDropdown() {
     const projects = [...new Set(masterRoster.map(e => e.project))].filter(Boolean);
     populateSelect('project', projects, '-- Select Project --');
-    resetDownstream('project');
   }
 
   function onProjectChange() {
     const proj = document.getElementById('project').value;
-    if (!proj) { resetDownstream('project'); return; }
-
     const filtered = masterRoster.filter(e => e.project === proj);
-    const orgs = [...new Set(filtered.map(e => e.organization))].filter(Boolean);
-
-    populateSelect('organization', orgs, '-- Select Organization --');
+    populateSelect('organization', [...new Set(filtered.map(e => e.organization))].filter(Boolean), '-- Select Organization --');
     document.getElementById('organization').disabled = false;
-    resetDownstream('organization');
   }
 
   function onOrganizationChange() {
     const proj = document.getElementById('project').value;
     const org = document.getElementById('organization').value;
-    if (!org) { resetDownstream('organization'); return; }
-
     const filtered = masterRoster.filter(e => e.project === proj && e.organization === org);
-    const dists = [...new Set(filtered.map(e => e.district))].filter(Boolean);
-
-    populateSelect('district', dists, '-- Select District --');
+    populateSelect('district', [...new Set(filtered.map(e => e.district))].filter(Boolean), '-- Select District --');
     document.getElementById('district').disabled = false;
-    resetDownstream('district');
   }
 
   function onDistrictChange() {
     const proj = document.getElementById('project').value;
     const org = document.getElementById('organization').value;
     const dist = document.getElementById('district').value;
-    if (!dist) { resetDownstream('district'); return; }
-
     const filtered = masterRoster.filter(e => e.project === proj && e.organization === org && e.district === dist);
-    const ucs = [...new Set(filtered.map(e => e.unionCouncil))].filter(Boolean);
-
-    populateSelect('unionCouncil', ucs, '-- Select Union Council --');
+    populateSelect('unionCouncil', [...new Set(filtered.map(e => e.unionCouncil))].filter(Boolean), '-- Select Union Council --');
     document.getElementById('unionCouncil').disabled = false;
-    resetDownstream('unionCouncil');
   }
 
   function onUnionCouncilChange() {
@@ -681,14 +619,9 @@
     const org = document.getElementById('organization').value;
     const dist = document.getElementById('district').value;
     const uc = document.getElementById('unionCouncil').value;
-    if (!uc) { resetDownstream('unionCouncil'); return; }
-
     const filtered = masterRoster.filter(e => e.project === proj && e.organization === org && e.district === dist && e.unionCouncil === uc);
-    const names = [...new Set(filtered.map(e => e.fullName))].filter(Boolean);
-
-    populateSelect('fullName', names, '-- Select Full Name --');
+    populateSelect('fullName', [...new Set(filtered.map(e => e.fullName))].filter(Boolean), '-- Select Full Name --');
     document.getElementById('fullName').disabled = false;
-    resetDownstream('fullName');
   }
 
   function onFullNameChange() {
@@ -697,16 +630,11 @@
     const dist = document.getElementById('district').value;
     const uc = document.getElementById('unionCouncil').value;
     const name = document.getElementById('fullName').value;
-    if (!name) { resetDownstream('fullName'); return; }
-
     const filtered = masterRoster.filter(e => e.project === proj && e.organization === org && e.district === dist && e.unionCouncil === uc && e.fullName === name);
     const desigs = [...new Set(filtered.map(e => e.designation))].filter(Boolean);
-
     populateSelect('designation', desigs, '-- Select Designation --');
     document.getElementById('designation').disabled = false;
-    if (desigs.length === 1) {
-      document.getElementById('designation').value = desigs[0];
-    }
+    if (desigs.length === 1) document.getElementById('designation').value = desigs[0];
   }
 
   function populateSelect(id, items, placeholder) {
@@ -714,43 +642,20 @@
     el.innerHTML = `<option value="">${placeholder}</option>` + items.map(i => `<option value="${i}">${i}</option>`).join('');
   }
 
-  function resetDownstream(level) {
-    const seq = ['project', 'organization', 'district', 'unionCouncil', 'fullName', 'designation'];
-    const startIndex = seq.indexOf(level) + 1;
-
-    for (let i = startIndex; i < seq.length; i++) {
-      const field = document.getElementById(seq[i]);
-      field.innerHTML = `<option value="">-- Select ${formatLabel(seq[i - 1])} First --</option>`;
-      field.disabled = true;
-      field.value = "";
-    }
-  }
-
-  function formatLabel(s) {
-    return s.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());
-  }
-
   // --- FORM SUBMISSION HANDLER ---
   document.getElementById('attendanceForm').addEventListener('submit', function(e) {
     e.preventDefault();
 
-    // 1. OFFLINE / ONLINE TIME TAMPERING CHECK
     if (isTimeTamperedOffline()) {
-      showPopup("Submission Blocked", "Time Tampering Detected! You cannot submit your response with time tampering. Please set your phone clock to automatic network time.", "error");
+      showPopup("Submission Blocked", "Time Tampering Detected! Please set your device clock to automatic time.", "error");
       return;
     }
 
     const email = document.getElementById('userEmail').value.trim();
-    const timeVal = document.getElementById('timeDisplay').value;
     const locVal = document.getElementById('locationDisplay').value;
 
-    if (!email) {
-      showPopup("Missing Email", "Please enter your official email address.", "error");
-      return;
-    }
-
-    if (!locVal || locVal.includes("Acquiring") || locVal.includes("Denied") || locVal.includes("Unavailable") || locVal.includes("Tampering")) {
-      showPopup("Location Error", "Valid GPS coordinates are required. Tap the refresh icon to acquire location.", "error");
+    if (!email || !locVal || locVal.includes("Acquiring") || locVal.includes("Denied")) {
+      showPopup("Form Incomplete", "Please provide a valid email and GPS location.", "error");
       return;
     }
 
@@ -763,14 +668,9 @@
     const type = document.querySelector('input[name="type"]:checked').value;
     const remarks = document.getElementById('remarks').value;
 
-    if (!proj || !org || !dist || !uc || !name || !desig) {
-      showPopup("Incomplete Form", "Please select all required dropdown fields.", "error");
-      return;
-    }
-
-    const record = {
+    let record = {
       uid: 'UID-' + Date.now(),
-      email: email, // Real user email captured
+      email: email,
       project: proj,
       organization: org,
       district: dist,
@@ -778,12 +678,23 @@
       fullName: name,
       designation: desig,
       type: type,
-      time: timeVal,
+      time: document.getElementById('timeDisplay').value,
       location: locVal,
       remarks: remarks
     };
 
-    // 2. LOCAL OFFLINE DUPLICATE & LEAVE VALIDATION
+    if (type === 'Leave') {
+      const selectedDatesStr = document.getElementById('leaveDatesPicker').value;
+      if (!selectedDatesStr) {
+        showPopup("Missing Dates", "Please select at least one leave date on the calendar.", "error");
+        return;
+      }
+      const leaveDates = selectedDatesStr.split(', ').map(d => d.trim());
+      record.leaveCategory = document.getElementById('leaveCategory').value;
+      record.leaveDates = leaveDates;
+      record.time = `${leaveDates[0]} 09:00:00`;
+    }
+
     const offlineCheck = checkOfflineValidation(record);
     if (!offlineCheck.valid) {
       showPopup("Submission Blocked", offlineCheck.message, "error");
@@ -812,7 +723,7 @@
     .then(res => res.json())
     .then(res => {
       btn.disabled = false;
-      btn.textContent = "Submit Attendance";
+      btn.textContent = "Submit Request";
 
       if (res.status === 'SUCCESS') {
         saveLocalLogHistory(record);
@@ -821,50 +732,22 @@
       } 
       else if (res.status === 'SUCCESS_LEAVE') {
         saveLocalLogHistory(record);
-
-        const hrEmail = (res.emails && res.emails.hr) ? res.emails.hr : '';
-        const ccEmails = [];
-        if (res.emails && res.emails.sbcc) ccEmails.push(res.emails.sbcc);
-        if (res.emails && res.emails.epi) ccEmails.push(res.emails.epi);
-
-        const dateStr = record.time.split(' ')[0];
-        const subject = encodeURIComponent(`Leave Application - ${record.fullName} (${record.district})`);
-        const body = encodeURIComponent(
-          `Dear HR Officer,\n\nI am submitting my leave application for today (${dateStr}).\n\n` +
-          `Employee Details:\n` +
-          `- Full Name: ${record.fullName}\n` +
-          `- Designation: ${record.designation}\n` +
-          `- District: ${record.district}\n` +
-          `- Union Council: ${record.unionCouncil}\n` +
-          `- Project: ${record.project}\n` +
-          `- Reason / Remarks: ${record.remarks || 'N/A'}\n\n` +
-          `Regards,\n${record.fullName}`
-        );
-
-        const mailtoUrl = `mailto:${hrEmail}?cc=${ccEmails.join(',')}&subject=${subject}&body=${body}`;
-
-        showPopup("Leave Recorded", "Leave recorded in Google Sheets. Opening Gmail app...", "success");
-
-        setTimeout(() => {
-          window.location.href = mailtoUrl;
-          resetForm();
-        }, 1800);
+        showPopup("Leave Submitted", res.message, "success");
+        resetForm();
       }
       else if (res.status === 'VALIDATION_FAILED') {
-        showPopup("Submission Blocked", res.message, "error");
+        showPopup("Notice", res.message, "error");
       } else {
         saveLocally(record);
-        saveLocalLogHistory(record);
-        showPopup("Saved Offline", "Server error. Saved to offline queue.", "success");
+        showPopup("Saved Offline", "Server error. Queued for background sync.", "success");
         resetForm();
       }
     })
     .catch(() => {
       btn.disabled = false;
-      btn.textContent = "Submit Attendance";
+      btn.textContent = "Submit Request";
       saveLocally(record);
-      saveLocalLogHistory(record);
-      showPopup("Saved Offline", "Network issue. Saved to offline queue.", "success");
+      showPopup("Saved Offline", "Network drop. Saved to offline queue.", "success");
       resetForm();
     });
   }
@@ -876,32 +759,37 @@
     updateQueueBadge();
   }
 
-  // AUTOMATIC INSTANT SYNC WITHOUT REFRESH
-  function syncOfflineQueue() {
+  // FAST & SMOOTH ASYNC QUEUE SYNC (CONCURRENT SAFE)
+  async function syncOfflineQueue() {
     let queue = JSON.parse(localStorage.getItem('offline_attendance_queue') || '[]');
     if (queue.length === 0) return;
 
-    let completed = 0;
-    const total = queue.length;
+    let remainingQueue = [];
+    let syncedCount = 0;
 
-    queue.forEach(record => {
-      fetch(GAS_API_URL, {
-        method: 'POST',
-        body: JSON.stringify({ action: 'submitAttendance', record: record })
-      })
-      .then(res => res.json())
-      .then(() => {
-        completed++;
-        if (completed === total) {
-          localStorage.setItem('offline_attendance_queue', JSON.stringify([]));
-          updateQueueBadge();
-          showPopup("Queue Synced", "All pending offline records synced to Google Sheets automatically!", "success");
+    for (const record of queue) {
+      try {
+        const response = await fetch(GAS_API_URL, {
+          method: 'POST',
+          body: JSON.stringify({ action: 'submitAttendance', record: record })
+        });
+        const res = await response.json();
+        if (res.status === 'SUCCESS' || res.status === 'SUCCESS_LEAVE' || res.status === 'VALIDATION_FAILED') {
+          syncedCount++;
+        } else {
+          remainingQueue.push(record);
         }
-      })
-      .catch(() => {
-        // Keeps remaining unsynced records in queue if connection drops midway
-      });
-    });
+      } catch (err) {
+        remainingQueue.push(record);
+      }
+    }
+
+    localStorage.setItem('offline_attendance_queue', JSON.stringify(remainingQueue));
+    updateQueueBadge();
+
+    if (syncedCount > 0) {
+      showPopup("Sync Complete", `${syncedCount} offline record(s) processed. Any existing duplicate dates were automatically ignored.`, "success");
+    }
   }
 
   function resetForm() {
@@ -909,32 +797,23 @@
     document.getElementById('attendanceForm').reset();
     document.getElementById('userEmail').value = savedEmail;
     document.getElementById('typeIn').checked = true;
+    toggleAttendanceType();
+    if (datePickerInstance) datePickerInstance.clear();
     initProjectDropdown();
     fetchGPSLocation();
   }
 
   function showPopup(title, message, type = "error") {
     const modal = document.getElementById('popupModal');
-    const card = document.getElementById('popupCard');
     const icon = document.getElementById('popupIcon');
-
     document.getElementById('popupTitle').textContent = title;
     document.getElementById('popupMessage').textContent = message;
-
-    if (type === "success") {
-      modal.className = "popup-backdrop popup-success active";
-      icon.textContent = "✓";
-    } else {
-      modal.className = "popup-backdrop popup-error active";
-      icon.textContent = "!";
-    }
-
-    card.focus();
+    modal.className = type === "success" ? "popup-backdrop popup-success active" : "popup-backdrop popup-error active";
+    icon.textContent = type === "success" ? "✓" : "!";
   }
 
   function closePopup() {
-    const modal = document.getElementById('popupModal');
-    modal.classList.remove('active');
+    document.getElementById('popupModal').classList.remove('active');
   }
 </script>
 </body>

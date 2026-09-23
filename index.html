@@ -7,11 +7,13 @@
   <link rel="manifest" href="./manifest.json">
   <meta name="theme-color" content="#4f46e5">
   
+  <!-- Typography & Icons -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script src="https://unpkg.com/lucide@latest"></script>
 
+  <!-- Component Libraries -->
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
@@ -44,131 +46,268 @@
       justify-content: center;
     }
 
-    .portal-wrapper { width: 100%; max-width: 480px; }
+    .portal-wrapper {
+      width: 100%;
+      max-width: 480px;
+    }
 
+    /* TOP STATUS BAR */
     .status-bar {
-      display: flex; justify-content: space-between; align-items: center;
-      margin-bottom: 16px; padding: 8px 16px;
-      background: rgba(255, 255, 255, 0.7); backdrop-filter: blur(12px);
-      border: 1px solid rgba(255, 255, 255, 0.8); border-radius: 40px;
-      gap: 6px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+      padding: 8px 16px;
+      background: rgba(255, 255, 255, 0.7);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.8);
+      border-radius: 40px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.03);
     }
 
     .status-pill {
-      font-size: 0.75rem; font-weight: 700; padding: 6px 12px;
-      border-radius: 30px; display: inline-flex; align-items: center; gap: 6px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      padding: 6px 14px;
+      border-radius: 30px;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      letter-spacing: 0.02em;
     }
+    
     .pill-online { background: #dcfce7; color: #15803d; }
     .pill-offline { background: #fef3c7; color: #b45309; }
     .pill-queue { background: #f1f5f9; color: #475569; }
     .pill-queue.active { background: #e0e7ff; color: #3730a3; font-weight: 800; }
 
-    .btn-refresh-roster {
-      background: transparent; border: none; font-size: 0.75rem; font-weight: 700;
-      color: var(--primary); padding: 4px 8px; border-radius: 20px;
-      display: inline-flex; align-items: center; gap: 4px; transition: background 0.2s;
-    }
-    .btn-refresh-roster:hover { background: var(--primary-light); }
-
     .pulse-dot {
-      width: 8px; height: 8px; border-radius: 50%;
-      background-color: currentColor; animation: pulse 2s infinite;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background-color: currentColor;
+      animation: pulse 2s infinite;
     }
-    @keyframes pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.4; transform: scale(1.2); } }
+    @keyframes pulse {
+      0% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.4; transform: scale(1.2); }
+      100% { opacity: 1; transform: scale(1); }
+    }
 
+    /* CARD CONTAINER */
     .portal-card {
-      background: var(--card-bg); backdrop-filter: blur(16px);
-      border: 1px solid #ffffff; border-radius: var(--radius-xl);
-      box-shadow: var(--shadow-ambient); padding: 32px 28px;
+      background: var(--card-bg);
+      backdrop-filter: blur(16px);
+      border: 1px solid #ffffff;
+      border-radius: var(--radius-xl);
+      box-shadow: var(--shadow-ambient);
+      padding: 32px 28px;
     }
 
-    .brand-header { text-align: center; margin-bottom: 28px; }
+    .brand-header {
+      text-align: center;
+      margin-bottom: 28px;
+    }
     .brand-icon {
-      width: 48px; height: 48px; background: var(--primary-light); color: var(--primary);
-      border-radius: 16px; display: inline-flex; align-items: center; justify-content: center;
-      margin-bottom: 12px; box-shadow: 0 4px 12px rgba(79, 70, 229, 0.12);
+      width: 48px;
+      height: 48px;
+      background: var(--primary-light);
+      color: var(--primary);
+      border-radius: 16px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 12px;
+      box-shadow: 0 4px 12px rgba(79, 70, 229, 0.12);
     }
-    .brand-header h1 { font-size: 1.35rem; font-weight: 800; color: var(--text-main); margin: 0; }
-    .brand-header p { font-size: 0.83rem; color: var(--text-muted); margin-top: 4px; font-weight: 500; }
+    .brand-header h1 {
+      font-size: 1.35rem;
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      color: var(--text-main);
+      margin: 0;
+    }
+    .brand-header p {
+      font-size: 0.83rem;
+      color: var(--text-muted);
+      margin-top: 4px;
+      font-weight: 500;
+    }
 
-    .form-group { margin-bottom: 20px; }
+    /* FORM ELEMENTS */
+    .form-group {
+      margin-bottom: 20px;
+    }
+
     .form-label {
-      font-weight: 700; font-size: 0.75rem; text-transform: uppercase;
-      letter-spacing: 0.05em; color: var(--text-muted); margin-bottom: 8px;
-      display: flex; align-items: center; gap: 6px;
+      font-weight: 700;
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
     }
 
     .form-control, .form-select {
-      border-radius: var(--radius-md); border: 1.5px solid var(--border-color);
-      padding: 12px 16px; font-size: 0.9rem; font-weight: 600; color: var(--text-main);
-      background-color: #ffffff; transition: all 0.2s ease;
+      border-radius: var(--radius-md);
+      border: 1.5px solid var(--border-color);
+      padding: 12px 16px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: var(--text-main);
+      background-color: #ffffff;
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
     }
     .form-control:focus, .form-select:focus {
-      border-color: var(--primary); box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.1); outline: none;
+      border-color: var(--primary);
+      box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.1);
+      outline: none;
+    }
+    .form-control:disabled, .form-select:disabled {
+      background-color: #f8fafc;
+      color: #94a3b8;
+      cursor: not-allowed;
+      border-color: #f1f5f9;
     }
 
+    /* SEGMENTED TOGGLE SWITCH */
     .segmented-picker {
-      display: grid; grid-template-columns: 1fr 1fr 1fr;
-      background: #f1f5f9; padding: 5px; border-radius: var(--radius-md); gap: 4px;
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      background: #f1f5f9;
+      padding: 5px;
+      border-radius: var(--radius-md);
+      gap: 4px;
     }
     .segmented-picker input[type="radio"] { display: none; }
     .segmented-picker label {
-      display: flex; align-items: center; justify-content: center; gap: 6px;
-      padding: 10px 8px; font-weight: 700; font-size: 0.82rem; color: var(--text-muted);
-      border-radius: 10px; cursor: pointer; transition: all 0.25s ease; margin: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      padding: 10px 8px;
+      font-weight: 700;
+      font-size: 0.82rem;
+      color: var(--text-muted);
+      border-radius: 10px;
+      cursor: pointer;
+      transition: all 0.25s ease;
+      margin: 0;
     }
     .segmented-picker input[type="radio"]:checked + label {
-      background: #ffffff; color: var(--primary); box-shadow: 0 4px 12px rgba(0,0,0,0.06);
+      background: #ffffff;
+      color: var(--primary);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
     }
-    .segmented-picker input[id="typeLeave"]:checked + label { color: #d97706; }
+    .segmented-picker input[id="typeLeave"]:checked + label {
+      color: #d97706;
+    }
 
     .leave-panel {
-      background: #fffbeb; border: 1.5px solid #fde68a; border-radius: var(--radius-md);
-      padding: 18px; margin-bottom: 20px; display: none;
+      background: #fffbeb;
+      border: 1.5px solid #fde68a;
+      border-radius: var(--radius-md);
+      padding: 18px;
+      margin-bottom: 20px;
+      display: none;
+      animation: fadeIn 0.3s ease;
     }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: translateY(0); } }
 
-    .map-box { height: 140px; border-radius: var(--radius-md); border: 1.5px solid var(--border-color); margin-top: 10px; overflow: hidden; background: #e2e8f0; }
+    /* MAP CONTAINER */
+    .map-box {
+      height: 140px;
+      border-radius: var(--radius-md);
+      border: 1.5px solid var(--border-color);
+      margin-top: 10px;
+      overflow: hidden;
+    }
 
     .gps-refresh-btn {
-      background: var(--primary-light); color: var(--primary); border: none;
-      border-radius: 8px; padding: 4px 10px; font-size: 0.75rem; font-weight: 700;
-      display: flex; align-items: center; gap: 4px;
+      background: var(--primary-light);
+      color: var(--primary);
+      border: none;
+      border-radius: 8px;
+      padding: 4px 10px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      transition: background 0.2s;
     }
+    .gps-refresh-btn:hover { background: #e0e7ff; }
 
+    /* SUBMIT BUTTON */
     .btn-submit {
-      background: var(--primary); color: #ffffff; border: none;
-      border-radius: var(--radius-md); padding: 14px; font-weight: 700;
-      font-size: 0.95rem; width: 100%; box-shadow: var(--shadow-glow);
-      display: flex; align-items: center; justify-content: center; gap: 8px;
+      background: var(--primary);
+      color: #ffffff;
+      border: none;
+      border-radius: var(--radius-md);
+      padding: 14px;
+      font-weight: 700;
+      font-size: 0.95rem;
+      width: 100%;
+      box-shadow: var(--shadow-glow);
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
     }
-
-    .tamper-warning-box {
-      background: #fef2f2; border: 1px solid #fca5a5; color: #991b1b;
-      padding: 10px 14px; border-radius: 10px; font-size: 0.78rem;
-      font-weight: 600; margin-bottom: 16px; display: none;
+    .btn-submit:hover {
+      background: var(--primary-hover);
+      transform: translateY(-1px);
     }
+    .btn-submit:active { transform: translateY(0); }
 
+    /* POPUP MODAL */
     .popup-overlay {
-      position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-      background: rgba(15, 23, 42, 0.4); backdrop-filter: blur(6px);
-      display: flex; align-items: center; justify-content: center; z-index: 10000;
-      opacity: 0; visibility: hidden; transition: all 0.25s ease; padding: 20px;
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(15, 23, 42, 0.4);
+      backdrop-filter: blur(6px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 10000;
+      opacity: 0;
+      visibility: hidden;
+      transition: all 0.25s ease;
+      padding: 20px;
     }
     .popup-overlay.active { opacity: 1; visibility: visible; }
     .popup-box {
-      background: #ffffff; border-radius: var(--radius-xl); max-width: 360px;
-      width: 100%; padding: 28px 24px; text-align: center;
+      background: #ffffff;
+      border-radius: var(--radius-xl);
+      max-width: 360px;
+      width: 100%;
+      padding: 28px 24px;
+      text-align: center;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
     }
     .popup-icon-circle {
-      width: 52px; height: 52px; border-radius: 50%; display: flex;
-      align-items: center; justify-content: center; margin: 0 auto 16px auto;
+      width: 52px; height: 52px;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      margin: 0 auto 16px auto;
     }
     .popup-error .popup-icon-circle { background: #fee2e2; color: #dc2626; }
     .popup-warning .popup-icon-circle { background: #fef3c7; color: #b45309; }
     .popup-success .popup-icon-circle { background: #dcfce7; color: #166534; }
+    
     .popup-action-btn {
-      border: none; border-radius: var(--radius-md); padding: 12px;
-      font-weight: 700; font-size: 0.9rem; width: 100%; margin-top: 20px;
+      border: none;
+      border-radius: var(--radius-md);
+      padding: 12px;
+      font-weight: 700;
+      font-size: 0.9rem;
+      width: 100%;
+      margin-top: 20px;
+      transition: opacity 0.2s;
     }
     .popup-error .popup-action-btn { background: #dc2626; color: white; }
     .popup-warning .popup-action-btn { background: #b45309; color: white; }
@@ -179,43 +318,40 @@
 
 <div class="portal-wrapper">
   
+  <!-- NETWORK STATUS BAR -->
   <div class="status-bar">
     <span id="networkBadge" class="status-pill pill-online">
       <span class="pulse-dot"></span> Online
     </span>
-    <button type="button" class="btn-refresh-roster" onclick="refreshRosterCache()" title="Clear and reload cached staff roster">
-      <i data-lucide="rotate-cw" style="width: 13px; height: 13px;"></i> Sync Roster
-    </button>
     <span id="queueBadge" class="status-pill pill-queue">
-      <i data-lucide="refresh-cw" style="width: 13px; height: 13px;"></i> Queue: 0
+      <i data-lucide="refresh-cw" style="width: 14px; height: 14px;"></i> Queue: 0
     </span>
   </div>
 
+  <!-- MAIN PORTAL CARD -->
   <div class="portal-card">
+    
     <div class="brand-header">
       <div class="brand-icon">
-        <i data-lucide="shield-check" style="width: 26px; height: 26px;"></i>
+        <i data-lucide="user-check" style="width: 26px; height: 26px;"></i>
       </div>
       <h1>Attendance Portal</h1>
-      <p>Secure Anti-Tamper Verification</p>
-    </div>
-
-    <div id="tamperAlert" class="tamper-warning-box">
-      <i data-lucide="alert-triangle" style="width: 14px; height: 14px; display: inline-block;"></i>
-      <span id="tamperMessage">Time or Location anomaly detected.</span>
+      <p>Automated Verification Engine</p>
     </div>
 
     <form id="attendanceForm">
       
+      <!-- EMAIL -->
       <div class="form-group">
         <label class="form-label"><i data-lucide="mail" style="width: 14px;"></i> Email Address</label>
         <input type="email" id="userEmail" class="form-control" placeholder="name@organization.com" required onchange="localStorage.setItem('saved_user_email', this.value)">
       </div>
 
+      <!-- ROSTER DROPDOWNS -->
       <div class="form-group">
         <label class="form-label"><i data-lucide="folder-kanban" style="width: 14px;"></i> Project</label>
         <select id="project" class="form-select" onchange="onProjectChange()" required>
-          <option value="">Loading Projects...</option>
+          <option value="">-- Loading Projects --</option>
         </select>
       </div>
 
@@ -249,11 +385,12 @@
 
       <div class="form-group">
         <label class="form-label"><i data-lucide="briefcase" style="width: 14px;"></i> Designation</label>
-        <select id="designation" class="form-select" onchange="saveDropdownState('designation', this.value)" required disabled>
+        <select id="designation" class="form-select" required disabled>
           <option value="">-- Select Full Name First --</option>
         </select>
       </div>
 
+      <!-- SUBMISSION TYPE SELECTOR -->
       <div class="form-group">
         <label class="form-label"><i data-lucide="clock" style="width: 14px;"></i> Entry Type</label>
         <div class="segmented-picker">
@@ -268,6 +405,7 @@
         </div>
       </div>
 
+      <!-- LEAVE CONTAINER -->
       <div id="leaveContainer" class="leave-panel">
         <div class="mb-3">
           <label class="form-label">Leave Category</label>
@@ -289,11 +427,13 @@
         </div>
       </div>
 
+      <!-- TIME DISPLAY -->
       <div class="form-group" id="timeContainer">
         <label class="form-label"><i data-lucide="clock-3" style="width: 14px;"></i> Timestamp</label>
-        <input type="text" id="timeDisplay" class="form-control" readonly placeholder="Capturing time...">
+        <input type="text" id="timeDisplay" class="form-control" readonly placeholder="Capturing system time...">
       </div>
 
+      <!-- GPS LOCATION -->
       <div class="form-group">
         <div class="d-flex justify-content-between align-items-center mb-1">
           <label class="form-label mb-0"><i data-lucide="navigation" style="width: 14px;"></i> GPS Coordinates</label>
@@ -305,6 +445,7 @@
         <div id="mapContainer" class="map-box"></div>
       </div>
 
+      <!-- REMARKS -->
       <div class="form-group mb-4">
         <label class="form-label"><i data-lucide="message-square" style="width: 14px;"></i> Remarks <span class="text-muted text-transform-none fw-normal">(Optional)</span></label>
         <textarea id="remarks" class="form-control" rows="2" placeholder="Add optional notes..."></textarea>
@@ -317,6 +458,7 @@
   </div>
 </div>
 
+<!-- POPUP MODAL -->
 <div id="popupModal" class="popup-overlay popup-error">
   <div class="popup-box">
     <div id="popupIconCircle" class="popup-icon-circle">
@@ -333,25 +475,20 @@
 <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
 
 <script>
-  // Paste your deployed Google Apps Script Web App URL here
+  // Insert your deployed Apps Script Web App URL below
   const GAS_API_URL = "https://script.google.com/macros/s/AKfycbyLEMc5wnhuEbJXp7hP5Pmxhs4kKRU5LZABFqyd4ZnqJaWjJaVqUJhnqMFZPhXGUhFO-g/exec";
 
   let masterRoster = [];
-  let districtEmailsMap = {};
   let map = null, mapMarker = null;
   let datePickerInstance = null;
-
-  const bootPerfTime = performance.now();
-  const bootWallTime = Date.now();
-  let detectedTamperStatus = 'OK';
 
   window.addEventListener('load', () => {
     lucide.createIcons();
 
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('./sw.js')
-        .then(reg => console.log('SW Ready:', reg.scope))
-        .catch(err => console.log('SW Failed:', err));
+        .then(reg => console.log('Offline Engine Ready:', reg.scope))
+        .catch(err => console.log('Offline Engine Failed:', err));
     }
 
     const savedEmail = localStorage.getItem('saved_user_email');
@@ -363,14 +500,16 @@
     initLeafletMap();
     initDatePicker();
     fetchGPSLocation();
+    
+    // Load cached roster dataset and restore saved selections
     loadRosterData();
 
     if (navigator.onLine) syncOfflineQueue();
   });
 
+  // PREVENT NEW TAB CREATION ON LOCK SCREEN UNLOCK
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible') {
-      verifyTimeIntegrity();
       fetchGPSLocation(true);
       if (navigator.onLine) syncOfflineQueue();
     }
@@ -379,129 +518,36 @@
   window.addEventListener('online', () => { updateNetworkStatus(); syncOfflineQueue(); });
   window.addEventListener('offline', updateNetworkStatus);
 
-  function verifyTimeIntegrity() {
-    const perfElapsed = (performance.now() - bootPerfTime) / 1000;
-    const wallElapsed = (Date.now() - bootWallTime) / 1000;
-    const drift = Math.abs(perfElapsed - wallElapsed);
-
-    if (drift > 15) {
-      detectedTamperStatus = `FLAGGED: Offline Time Spoof Drift (${Math.round(drift)}s)`;
-      showTamperAlert(`Clock Tampering Detected! Device time shifted by ${Math.round(drift)}s.`);
-      return false;
-    }
-    return true;
-  }
-
-  function showTamperAlert(msg) {
-    const box = document.getElementById('tamperAlert');
-    document.getElementById('tamperMessage').textContent = msg;
-    box.style.display = 'block';
-  }
-
-  function checkLocationTampering(coords, accuracy) {
-    if (accuracy === 0) {
-      detectedTamperStatus = (detectedTamperStatus === 'OK') ? 'FLAGGED: Mock GPS' : detectedTamperStatus + ' | Mock GPS';
-    }
-  }
-
-  function normalizeRecord(item) {
-    if (!item || typeof item !== 'object') return {};
-    return {
-      project: String(item.project || item.Project || item['Project Name'] || '').trim(),
-      organization: String(item.organization || item.Organization || item['Org'] || '').trim(),
-      district: String(item.district || item.District || '').trim(),
-      unionCouncil: String(item.unionCouncil || item.UnionCouncil || item['Union Council'] || item['UC'] || '').trim(),
-      fullName: String(item.fullName || item.FullName || item['Full Name'] || item['Name'] || '').trim(),
-      designation: String(item.designation || item.Designation || item['Designation'] || '').trim()
-    };
-  }
-
-  /* ROSTER ENGINE WITH GET FALLBACK */
-  function loadRosterData(forceFetch = false) {
+  /* ROSTER CACHING & DROPDOWN PERSISTENCE */
+  function loadRosterData() {
     const cachedRoster = localStorage.getItem('employee_roster_cache');
-    const cachedEmails = localStorage.getItem('district_emails_cache');
 
-    if (!forceFetch && cachedRoster) {
-      try {
-        const raw = JSON.parse(cachedRoster);
-        if (Array.isArray(raw) && raw.length > 0) {
-          masterRoster = raw.map(normalizeRecord);
-          initProjectDropdown();
-          restoreSavedDropdownSelections();
-        }
-      } catch(e) {
-        console.error("Cache parse error:", e);
-      }
+    if (cachedRoster) {
+      masterRoster = JSON.parse(cachedRoster);
+      initProjectDropdown();
+      restoreSavedDropdownSelections();
     }
 
-    if (!forceFetch && cachedEmails) {
-      try { districtEmailsMap = JSON.parse(cachedEmails); } catch(e) {}
-    }
-
-    if (!GAS_API_URL || GAS_API_URL.includes("YOUR_DEPLOYED_WEB_APP_URL_HERE")) {
-      document.getElementById('project').innerHTML = `<option value="">-- API URL Not Configured --</option>`;
-      return;
-    }
-
-    if (navigator.onLine) {
-      // Use GET request with query parameter to guarantee smooth CORS handling
-      const fetchUrl = `${GAS_API_URL}?action=getEmployees&t=${Date.now()}`;
-
-      fetch(fetchUrl, { method: 'GET' })
+    if (navigator.onLine && GAS_API_URL !== "YOUR_DEPLOYED_WEB_APP_URL_HERE") {
+      fetch(GAS_API_URL, { method: 'POST', body: JSON.stringify({ action: 'getEmployees' }) })
       .then(res => res.json())
       .then(res => {
-        if (res.status === 'SUCCESS' || res.employees) {
-          const list = res.employees || res.data || [];
-          if (list.length > 0) {
-            masterRoster = list.map(normalizeRecord);
-            localStorage.setItem('employee_roster_cache', JSON.stringify(masterRoster));
+        if (res.status === 'SUCCESS' && res.employees && res.employees.length > 0) {
+          masterRoster = res.employees;
+          localStorage.setItem('employee_roster_cache', JSON.stringify(masterRoster));
+          
+          if (!cachedRoster) {
+            initProjectDropdown();
+            restoreSavedDropdownSelections();
           }
-          if (res.emailsMap) {
-            districtEmailsMap = res.emailsMap;
-            localStorage.setItem('district_emails_cache', JSON.stringify(districtEmailsMap));
-          }
-
-          initProjectDropdown();
-          restoreSavedDropdownSelections();
-
-          if (forceFetch) {
-            showPopup("Roster Updated", "Employee roster refreshed successfully.", "success");
-          }
-        } else {
-          showProjectError("Failed to parse roster data from backend.");
         }
       })
-      .catch((err) => {
-        console.warn("Roster fetch error:", err);
-        if (masterRoster.length === 0) {
-          showProjectError("Unable to connect to Google Sheet API.");
-        }
-        if (forceFetch) {
-          showPopup("Sync Failed", "Could not reach server. Cached roster remains active.", "warning");
-        }
-      });
-    } else if (masterRoster.length === 0) {
-      showProjectError("Offline - Connect to internet to load roster.");
+      .catch(() => console.log('Using offline roster cache'));
     }
   }
 
-  function showProjectError(msg) {
-    const projSelect = document.getElementById('project');
-    projSelect.innerHTML = `<option value="">Error: ${msg}</option>`;
-    projSelect.disabled = true;
-  }
-
-  function refreshRosterCache() {
-    if (!navigator.onLine) {
-      showPopup("Offline Mode", "Connect to the internet to sync fresh roster data.", "warning");
-      return;
-    }
-    loadRosterData(true);
-  }
-
-  function saveDropdownState(key, value) { 
-    if (value) localStorage.setItem(`form_${key}`, value);
-    else localStorage.removeItem(`form_${key}`);
+  function saveDropdownState(key, value) {
+    localStorage.setItem(`form_${key}`, value);
   }
 
   function restoreSavedDropdownSelections() {
@@ -512,83 +558,55 @@
     const savedName = localStorage.getItem('form_fullName');
     const savedDesig = localStorage.getItem('form_designation');
 
-    if (savedProj) { 
-      document.getElementById('project').value = savedProj; 
-      onProjectChange(false); 
+    if (savedProj) {
+      document.getElementById('project').value = savedProj;
+      onProjectChange(false);
     }
-    if (savedOrg) { 
-      document.getElementById('organization').value = savedOrg; 
-      onOrganizationChange(false); 
+    if (savedOrg) {
+      document.getElementById('organization').value = savedOrg;
+      onOrganizationChange(false);
     }
-    if (savedDist) { 
-      document.getElementById('district').value = savedDist; 
-      onDistrictChange(false); 
+    if (savedDist) {
+      document.getElementById('district').value = savedDist;
+      onDistrictChange(false);
     }
-    if (savedUc) { 
-      document.getElementById('unionCouncil').value = savedUc; 
-      onUnionCouncilChange(false); 
+    if (savedUc) {
+      document.getElementById('unionCouncil').value = savedUc;
+      onUnionCouncilChange(false);
     }
-    if (savedName) { 
-      document.getElementById('fullName').value = savedName; 
-      onFullNameChange(false); 
+    if (savedName) {
+      document.getElementById('fullName').value = savedName;
+      onFullNameChange(false);
     }
-    if (savedDesig) { 
-      document.getElementById('designation').value = savedDesig; 
+    if (savedDesig) {
+      document.getElementById('designation').value = savedDesig;
     }
   }
 
   function initProjectDropdown() {
     const projects = [...new Set(masterRoster.map(e => e.project))].filter(Boolean);
-    if (projects.length === 0) {
-      showProjectError("No projects found in roster sheet.");
-      return;
-    }
     populateSelect('project', projects, '-- Select Project --');
-    document.getElementById('project').disabled = false;
   }
 
   function onProjectChange(resetChildKeys = true) {
     const proj = document.getElementById('project').value;
     saveDropdownState('project', proj);
-    
     if (resetChildKeys) clearChildSelections(['organization', 'district', 'unionCouncil', 'fullName', 'designation']);
 
-    const orgSelect = document.getElementById('organization');
-    if (!proj) {
-      resetSelect('organization', '-- Select Project First --');
-      resetSelect('district', '-- Select Organization First --');
-      resetSelect('unionCouncil', '-- Select District First --');
-      resetSelect('fullName', '-- Select Union Council First --');
-      resetSelect('designation', '-- Select Full Name First --');
-      return;
-    }
-
     const filtered = masterRoster.filter(e => e.project === proj);
-    const orgs = [...new Set(filtered.map(e => e.organization))].filter(Boolean);
-    populateSelect('organization', orgs, '-- Select Organization --');
-    orgSelect.disabled = orgs.length === 0;
+    populateSelect('organization', [...new Set(filtered.map(e => e.organization))].filter(Boolean), '-- Select Organization --');
+    document.getElementById('organization').disabled = false;
   }
 
   function onOrganizationChange(resetChildKeys = true) {
     const proj = document.getElementById('project').value;
     const org = document.getElementById('organization').value;
     saveDropdownState('organization', org);
-    
     if (resetChildKeys) clearChildSelections(['district', 'unionCouncil', 'fullName', 'designation']);
 
-    const distSelect = document.getElementById('district');
-    if (!org) {
-      resetSelect('district', '-- Select Organization First --');
-      resetSelect('unionCouncil', '-- Select District First --');
-      resetSelect('fullName', '-- Select Union Council First --');
-      resetSelect('designation', '-- Select Full Name First --');
-      return;
-    }
-
     const filtered = masterRoster.filter(e => e.project === proj && e.organization === org);
-    const dists = [...new Set(filtered.map(e => e.district))].filter(Boolean);
-    populateSelect('district', dists, '-- Select District --');
-    distSelect.disabled = dists.length === 0;
+    populateSelect('district', [...new Set(filtered.map(e => e.district))].filter(Boolean), '-- Select District --');
+    document.getElementById('district').disabled = false;
   }
 
   function onDistrictChange(resetChildKeys = true) {
@@ -596,21 +614,11 @@
     const org = document.getElementById('organization').value;
     const dist = document.getElementById('district').value;
     saveDropdownState('district', dist);
-    
     if (resetChildKeys) clearChildSelections(['unionCouncil', 'fullName', 'designation']);
 
-    const ucSelect = document.getElementById('unionCouncil');
-    if (!dist) {
-      resetSelect('unionCouncil', '-- Select District First --');
-      resetSelect('fullName', '-- Select Union Council First --');
-      resetSelect('designation', '-- Select Full Name First --');
-      return;
-    }
-
     const filtered = masterRoster.filter(e => e.project === proj && e.organization === org && e.district === dist);
-    const ucs = [...new Set(filtered.map(e => e.unionCouncil))].filter(Boolean);
-    populateSelect('unionCouncil', ucs, '-- Select Union Council --');
-    ucSelect.disabled = ucs.length === 0;
+    populateSelect('unionCouncil', [...new Set(filtered.map(e => e.unionCouncil))].filter(Boolean), '-- Select Union Council --');
+    document.getElementById('unionCouncil').disabled = false;
   }
 
   function onUnionCouncilChange(resetChildKeys = true) {
@@ -619,20 +627,11 @@
     const dist = document.getElementById('district').value;
     const uc = document.getElementById('unionCouncil').value;
     saveDropdownState('unionCouncil', uc);
-    
     if (resetChildKeys) clearChildSelections(['fullName', 'designation']);
 
-    const nameSelect = document.getElementById('fullName');
-    if (!uc) {
-      resetSelect('fullName', '-- Select Union Council First --');
-      resetSelect('designation', '-- Select Full Name First --');
-      return;
-    }
-
     const filtered = masterRoster.filter(e => e.project === proj && e.organization === org && e.district === dist && e.unionCouncil === uc);
-    const names = [...new Set(filtered.map(e => e.fullName))].filter(Boolean);
-    populateSelect('fullName', names, '-- Select Full Name --');
-    nameSelect.disabled = names.length === 0;
+    populateSelect('fullName', [...new Set(filtered.map(e => e.fullName))].filter(Boolean), '-- Select Full Name --');
+    document.getElementById('fullName').disabled = false;
   }
 
   function onFullNameChange(resetChildKeys = true) {
@@ -643,48 +642,28 @@
     const name = document.getElementById('fullName').value;
     saveDropdownState('fullName', name);
 
-    if (resetChildKeys) clearChildSelections(['designation']);
-
-    const desigSelect = document.getElementById('designation');
-    if (!name) {
-      resetSelect('designation', '-- Select Full Name First --');
-      return;
-    }
-
     const filtered = masterRoster.filter(e => e.project === proj && e.organization === org && e.district === dist && e.unionCouncil === uc && e.fullName === name);
     const desigs = [...new Set(filtered.map(e => e.designation))].filter(Boolean);
     
     populateSelect('designation', desigs, '-- Select Designation --');
-    desigSelect.disabled = desigs.length === 0;
+    document.getElementById('designation').disabled = false;
 
     if (desigs.length === 1) {
-      desigSelect.value = desigs[0];
+      document.getElementById('designation').value = desigs[0];
       saveDropdownState('designation', desigs[0]);
     }
 
     fetchServerMonthSummary(name);
   }
 
-  function clearChildSelections(keys) { 
-    keys.forEach(k => localStorage.removeItem(`form_${k}`)); 
+  function clearChildSelections(keys) {
+    keys.forEach(k => localStorage.removeItem(`form_${k}`));
   }
 
-  function resetSelect(id, placeholder) {
-    const el = document.getElementById(id);
-    el.innerHTML = `<option value="">${placeholder}</option>`;
-    el.value = "";
-    el.disabled = true;
-  }
-
-  function populateSelect(id, items, placeholder) {
-    const el = document.getElementById(id);
-    el.innerHTML = `<option value="">${placeholder}</option>` + items.map(i => `<option value="${i}">${i}</option>`).join('');
-  }
-
-  /* GPS & LEAFLET MAP */
+  /* GPS LOCATION */
   function fetchGPSLocation(forceRefresh = false) {
     const locInput = document.getElementById('locationDisplay');
-    locInput.value = "Acquiring GPS position...";
+    locInput.value = "Acquiring GPS coordinates...";
 
     if (!navigator.onLine && !forceRefresh) {
       const cachedLoc = localStorage.getItem('cached_last_gps');
@@ -703,7 +682,6 @@
 
     navigator.geolocation.getCurrentPosition(
       (pos) => {
-        checkLocationTampering(pos.coords, pos.coords.accuracy);
         const lat = pos.coords.latitude.toFixed(6);
         const lng = pos.coords.longitude.toFixed(6);
         const formattedLoc = `${lat}, ${lng}`;
@@ -720,10 +698,8 @@
   }
 
   function initLeafletMap() {
-    try {
-      map = L.map('mapContainer', { zoomControl: false }).setView([20.0, 0.0], 2);
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
-    } catch(e) {}
+    map = L.map('mapContainer', { zoomControl: false }).setView([20.0, 0.0], 2);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
   }
 
   function updateMapMarker(lat, lng) {
@@ -733,35 +709,7 @@
     else mapMarker = L.marker([lat, lng]).addTo(map);
   }
 
-  /* AUTOMATED GMAIL LEAVE REQUEST */
-  function triggerGmailLeaveRequest(record) {
-    const dist = record.district;
-    const distEmails = districtEmailsMap[dist] || {};
-
-    const hrEmail = distEmails.hr || "hr@organization.org";
-    const ccList = [distEmails.sbcc, distEmails.epi].filter(Boolean).join(',');
-
-    const datesList = (record.leaveDates || []).join(', ');
-    const subject = encodeURIComponent(`Leave Application - ${record.fullName} (${dist})`);
-    
-    const bodyText = `Dear HR Officer,\n\nI am writing to formally submit a leave application for your review and approval.\n\n` +
-      `-- LEAVE DETAILS --\n` +
-      `• Name: ${record.fullName}\n` +
-      `• Designation: ${record.designation}\n` +
-      `• Project: ${record.project}\n` +
-      `• District: ${record.district}\n` +
-      `• Union Council: ${record.unionCouncil}\n` +
-      `• Leave Type: ${record.leaveCategory}\n` +
-      `• Requested Dates: ${datesList}\n` +
-      `• Remarks: ${record.remarks || 'N/A'}\n\n` +
-      `Thank you.\n\n` +
-      `Regards,\n${record.fullName}\n${record.email}`;
-
-    const mailtoUrl = `mailto:${hrEmail}?cc=${encodeURIComponent(ccList)}&subject=${subject}&body=${encodeURIComponent(bodyText)}`;
-    
-    setTimeout(() => { window.location.href = mailtoUrl; }, 600);
-  }
-
+  /* LOCAL LOGS & VALIDATION */
   function getTodayStr() {
     const d = new Date();
     const pad = n => String(n).padStart(2, '0');
@@ -774,7 +722,9 @@
     return `${pad(d.getMonth() + 1)}/${d.getFullYear()}`;
   }
 
-  function getLocalLogs() { return JSON.parse(localStorage.getItem('user_attendance_logs') || '[]'); }
+  function getLocalLogs() {
+    return JSON.parse(localStorage.getItem('user_attendance_logs') || '[]');
+  }
 
   function pruneLocalCache() {
     let logs = getLocalLogs();
@@ -784,15 +734,10 @@
     logs = logs.filter(r => {
       const isLeave = r.type && r.type.startsWith('Leave');
       if (isLeave) {
-        const dateParts = (r.time || '').split(' ')[0].split('/');
-        if (dateParts.length === 3) {
-          const m = dateParts[1].padStart(2, '0');
-          const y = dateParts[2];
-          return `${m}/${y}` === currentMY;
-        }
-        return false;
+        const dateParts = r.time.split(' ')[0].split('/');
+        return dateParts.length === 3 && `${dateParts[1]}/${dateParts[2]}` === currentMY;
       } else {
-        return (r.time || '').startsWith(todayStr);
+        return r.time.startsWith(todayStr);
       }
     });
 
@@ -809,12 +754,12 @@
 
   function validateLocally(record) {
     const todayStr = getTodayStr();
-    const logs = pruneLocalCache().filter(r => (r.fullName || '').toLowerCase() === (record.fullName || '').toLowerCase());
+    const logs = pruneLocalCache().filter(r => r.fullName.toLowerCase() === record.fullName.toLowerCase());
 
     if (record.type === 'Leave') {
       const leaveDates = record.leaveDates || [];
       for (let targetDate of leaveDates) {
-        const hasLeave = logs.some(r => (r.time || '').startsWith(targetDate) && r.type.startsWith('Leave'));
+        const hasLeave = logs.some(r => r.time.startsWith(targetDate) && r.type.startsWith('Leave'));
         if (hasLeave) {
           return { valid: false, title: "Leave Conflict", message: `Leave record already exists for ${record.fullName} on ${targetDate}.` };
         }
@@ -822,7 +767,7 @@
       return { valid: true };
     }
 
-    const todayLogs = logs.filter(r => (r.time || '').startsWith(todayStr));
+    const todayLogs = logs.filter(r => r.time.startsWith(todayStr));
     const hasLeaveToday = todayLogs.some(r => r.type.startsWith('Leave'));
     const hasCheckInToday = todayLogs.some(r => r.type === 'Check-In');
     const hasCheckOutToday = todayLogs.some(r => r.type === 'Check-Out');
@@ -853,11 +798,9 @@
     return { valid: true };
   }
 
-  /* SUBMISSION CONTROLLER */
+  /* FORM SUBMISSION */
   document.getElementById('attendanceForm').addEventListener('submit', function(e) {
     e.preventDefault();
-
-    verifyTimeIntegrity();
 
     const email = document.getElementById('userEmail').value.trim();
     const locVal = document.getElementById('locationDisplay').value;
@@ -893,9 +836,9 @@
       designation: desig,
       type: type,
       time: currentTimeFormatted,
+      submissionTime: currentTimeFormatted,
       location: locVal,
-      remarks: remarks,
-      tamperStatus: detectedTamperStatus
+      remarks: remarks
     };
 
     if (type === 'Leave') {
@@ -924,12 +867,11 @@
       saveLocalLog(record);
     }
 
-    if (navigator.onLine && GAS_API_URL && !GAS_API_URL.includes("YOUR_DEPLOYED_WEB_APP_URL_HERE")) {
+    if (navigator.onLine && GAS_API_URL !== "YOUR_DEPLOYED_WEB_APP_URL_HERE") {
       sendToServerDirectly(record);
     } else {
       saveLocallyOffline(record);
-      showPopup("Saved Offline", "No active connection or backend URL. Entry queued locally.", "warning");
-      if (type === 'Leave') triggerGmailLeaveRequest(record);
+      showPopup("Saved Offline", "No active connection. Entry queued locally and will sync automatically when online.", "warning");
       resetForm();
     }
   });
@@ -941,7 +883,6 @@
 
     fetch(GAS_API_URL, {
       method: 'POST',
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
       body: JSON.stringify({ action: 'submitAttendance', record: record })
     })
     .then(res => res.json())
@@ -952,12 +893,10 @@
 
       if (res.status === 'SUCCESS' || res.status === 'SUCCESS_LEAVE') {
         showPopup("Submitted Successfully", `Entry recorded for ${record.fullName}.`, "success");
-        if (record.type === 'Leave') triggerGmailLeaveRequest(record);
         resetForm();
       } else {
         saveLocallyOffline(record);
-        showPopup("Queued Offline", res.message || "Server issue. Saved locally.", "warning");
-        if (record.type === 'Leave') triggerGmailLeaveRequest(record);
+        showPopup("Queued Offline", res.message || "Server issue encountered. Saved locally.", "warning");
         resetForm();
       }
     })
@@ -967,7 +906,6 @@
       lucide.createIcons();
       saveLocallyOffline(record);
       showPopup("Saved Offline", "Connection timeout. Queued locally for background sync.", "warning");
-      if (record.type === 'Leave') triggerGmailLeaveRequest(record);
       resetForm();
     });
   }
@@ -981,7 +919,7 @@
 
   async function syncOfflineQueue() {
     let queue = JSON.parse(localStorage.getItem('offline_attendance_queue') || '[]');
-    if (queue.length === 0 || !GAS_API_URL || GAS_API_URL.includes("YOUR_DEPLOYED_WEB_APP_URL_HERE")) return;
+    if (queue.length === 0 || GAS_API_URL === "YOUR_DEPLOYED_WEB_APP_URL_HERE") return;
 
     let remainingQueue = [];
     let syncedCount = 0;
@@ -990,7 +928,6 @@
       try {
         const response = await fetch(GAS_API_URL, {
           method: 'POST',
-          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
           body: JSON.stringify({ action: 'submitAttendance', record: record })
         });
         const res = await response.json();
@@ -1007,13 +944,18 @@
   }
 
   function fetchServerMonthSummary(fullName) {
-    if (!navigator.onLine || !GAS_API_URL || GAS_API_URL.includes("YOUR_DEPLOYED_WEB_APP_URL_HERE")) return;
+    if (!navigator.onLine || GAS_API_URL === "YOUR_DEPLOYED_WEB_APP_URL_HERE") return;
 
     const todayStr = getTodayStr();
     const currentMY = getCurrentMonthYearStr();
 
-    fetch(`${GAS_API_URL}?action=getUserMonthSummary&fullName=${encodeURIComponent(fullName)}&monthYear=${encodeURIComponent(currentMY)}`, {
-      method: 'GET'
+    fetch(GAS_API_URL, {
+      method: 'POST',
+      body: JSON.stringify({
+        action: 'getUserMonthSummary',
+        fullName: fullName,
+        monthYear: currentMY
+      })
     })
     .then(res => res.json())
     .then(res => {
@@ -1023,12 +965,12 @@
         const validServerRecords = res.records.filter(r => {
           const isLeave = r.type && r.type.startsWith('Leave');
           if (isLeave) return true;
-          return (r.time || '').startsWith(todayStr);
+          return r.time.startsWith(todayStr);
         });
 
         validServerRecords.forEach(serverRec => {
           const exists = localLogs.some(l => 
-            (l.fullName || '').toLowerCase() === (serverRec.fullName || '').toLowerCase() && 
+            l.fullName.toLowerCase() === serverRec.fullName.toLowerCase() && 
             l.time === serverRec.time && 
             l.type === serverRec.type
           );
@@ -1042,6 +984,7 @@
     .catch(() => {});
   }
 
+  /* HELPERS & UI CONTROLS */
   function initDatePicker() {
     datePickerInstance = flatpickr("#leaveDatesPicker", {
       mode: "multiple", dateFormat: "d/m/Y", conjunction: ", ", minDate: "today"
@@ -1073,8 +1016,13 @@
     const queue = JSON.parse(localStorage.getItem('offline_attendance_queue') || '[]');
     const badge = document.getElementById('queueBadge');
     badge.className = queue.length > 0 ? "status-pill pill-queue active" : "status-pill pill-queue";
-    badge.innerHTML = `<i data-lucide="refresh-cw" style="width: 13px; height: 13px;"></i> Queue: ${queue.length}`;
+    badge.innerHTML = `<i data-lucide="refresh-cw" style="width: 14px;"></i> Queue: ${queue.length}`;
     lucide.createIcons();
+  }
+
+  function populateSelect(id, items, placeholder) {
+    const el = document.getElementById(id);
+    el.innerHTML = `<option value="">${placeholder}</option>` + items.map(i => `<option value="${i}">${i}</option>`).join('');
   }
 
   function resetForm() {

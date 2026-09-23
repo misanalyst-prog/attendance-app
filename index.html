@@ -51,16 +51,24 @@
       margin-bottom: 16px; padding: 8px 16px;
       background: rgba(255, 255, 255, 0.7); backdrop-filter: blur(12px);
       border: 1px solid rgba(255, 255, 255, 0.8); border-radius: 40px;
+      gap: 6px;
     }
 
     .status-pill {
-      font-size: 0.75rem; font-weight: 700; padding: 6px 14px;
+      font-size: 0.75rem; font-weight: 700; padding: 6px 12px;
       border-radius: 30px; display: inline-flex; align-items: center; gap: 6px;
     }
     .pill-online { background: #dcfce7; color: #15803d; }
     .pill-offline { background: #fef3c7; color: #b45309; }
     .pill-queue { background: #f1f5f9; color: #475569; }
     .pill-queue.active { background: #e0e7ff; color: #3730a3; font-weight: 800; }
+
+    .btn-refresh-roster {
+      background: transparent; border: none; font-size: 0.75rem; font-weight: 700;
+      color: var(--primary); padding: 4px 8px; border-radius: 20px;
+      display: inline-flex; align-items: center; gap: 4px; transition: background 0.2s;
+    }
+    .btn-refresh-roster:hover { background: var(--primary-light); }
 
     .pulse-dot {
       width: 8px; height: 8px; border-radius: 50%;
@@ -119,7 +127,7 @@
       padding: 18px; margin-bottom: 20px; display: none;
     }
 
-    .map-box { height: 140px; border-radius: var(--radius-md); border: 1.5px solid var(--border-color); margin-top: 10px; overflow: hidden; }
+    .map-box { height: 140px; border-radius: var(--radius-md); border: 1.5px solid var(--border-color); margin-top: 10px; overflow: hidden; background: #e2e8f0; }
 
     .gps-refresh-btn {
       background: var(--primary-light); color: var(--primary); border: none;
@@ -175,8 +183,11 @@
     <span id="networkBadge" class="status-pill pill-online">
       <span class="pulse-dot"></span> Online
     </span>
+    <button type="button" class="btn-refresh-roster" onclick="refreshRosterCache()" title="Clear and reload cached staff roster">
+      <i data-lucide="rotate-cw" style="width: 13px; height: 13px;"></i> Sync Roster
+    </button>
     <span id="queueBadge" class="status-pill pill-queue">
-      <i data-lucide="refresh-cw" style="width: 14px; height: 14px;"></i> Queue: 0
+      <i data-lucide="refresh-cw" style="width: 13px; height: 13px;"></i> Queue: 0
     </span>
   </div>
 
@@ -374,7 +385,6 @@
     const wallElapsed = (Date.now() - bootWallTime) / 1000;
     const drift = Math.abs(perfElapsed - wallElapsed);
 
-    // If wall clock moved by more than 15 seconds relative to high-res performance timer
     if (drift > 15) {
       detectedTamperStatus = `FLAGGED: Offline Time Spoof Drift (${Math.round(drift)}s)`;
       showTamperAlert(`Clock Tampering Detected! Device time shifted by ${Math.round(drift)}s.`);
@@ -382,7 +392,6 @@
     }
 
     if (navigator.onLine) {
-      // Fetch trusted network time asynchronously
       fetch('https://worldtimeapi.org/api/timezone/Etc/UTC', { method: 'GET', cache: 'no-store' })
         .then(r => r.json())
         .then(data => {
@@ -408,7 +417,6 @@
   }
 
   function checkLocationTampering(coords, accuracy) {
-    // Flag suspicious accuracy (e.g. mock location tools reporting exactly 0.0m precision)
     if (accuracy === 0) {
       detectedTamperStatus = (detectedTamperStatus === 'OK') ? 'FLAGGED: Mock GPS (Zero Accuracy)' : detectedTamperStatus + ' | Mock GPS';
       return;
@@ -421,7 +429,6 @@
         const distKm = calculateDistanceKm(prev.lat, prev.lng, coords.latitude, coords.longitude);
         const hours = (Date.now() - prev.timestamp) / (1000 * 3600);
         
-        // If speed exceeds 300 km/h between submissions, flag impossible movement speed
         if (hours > 0 && (distKm / hours) > 300) {
           detectedTamperStatus = (detectedTamperStatus === 'OK') ? `FLAGGED: GPS Teleportation (${Math.round(distKm)}km in ${Math.round(hours*60)}m)` : detectedTamperStatus + ' | GPS Teleport';
         }
@@ -446,16 +453,16 @@
   }
 
   /* ROSTER & EMAIL DATA ENGINE */
-  function loadRosterData() {
+  function loadRosterData(forceFetch = false) {
     const cachedRoster = localStorage.getItem('employee_roster_cache');
     const cachedEmails = localStorage.getItem('district_emails_cache');
 
-    if (cachedRoster) {
+    if (!forceFetch && cachedRoster) {
       masterRoster = JSON.parse(cachedRoster);
       initProjectDropdown();
       restoreSavedDropdownSelections();
     }
-    if (cachedEmails) {
+    if (!forceFetch && cachedEmails) {
       districtEmailsMap = JSON.parse(cachedEmails);
     }
 
@@ -473,14 +480,26 @@
             localStorage.setItem('district_emails_cache', JSON.stringify(districtEmailsMap));
           }
 
-          if (!cachedRoster) {
-            initProjectDropdown();
-            restoreSavedDropdownSelections();
+          initProjectDropdown();
+          restoreSavedDropdownSelections();
+
+          if (forceFetch) {
+            showPopup("Roster Updated", "Employee roster and district mappings refreshed successfully.", "success");
           }
         }
       })
-      .catch(() => console.log('Offline roster fallback active'));
+      .catch(() => {
+        if (forceFetch) showPopup("Sync Failed", "Could not reach server to update roster. Offline cache active.", "warning");
+      });
     }
+  }
+
+  function refreshRosterCache() {
+    if (!navigator.onLine) {
+      showPopup("Offline Mode", "Connect to the internet to sync fresh roster data.", "warning");
+      return;
+    }
+    loadRosterData(true);
   }
 
   function saveDropdownState(key, value) { localStorage.setItem(`form_${key}`, value); }
@@ -615,8 +634,12 @@
   }
 
   function initLeafletMap() {
-    map = L.map('mapContainer', { zoomControl: false }).setView([20.0, 0.0], 2);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
+    try {
+      map = L.map('mapContainer', { zoomControl: false }).setView([20.0, 0.0], 2);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
+    } catch(e) {
+      console.log('Leaflet tile render note:', e);
+    }
   }
 
   function updateMapMarker(lat, lng) {
@@ -681,7 +704,12 @@
       const isLeave = r.type && r.type.startsWith('Leave');
       if (isLeave) {
         const dateParts = r.time.split(' ')[0].split('/');
-        return dateParts.length === 3 && `${dateParts[1]}/${dateParts[2]}` === currentMY;
+        if (dateParts.length === 3) {
+          const m = dateParts[1].padStart(2, '0');
+          const y = dateParts[2];
+          return `${m}/${y}` === currentMY;
+        }
+        return false;
       } else {
         return r.time.startsWith(todayStr);
       }
@@ -967,7 +995,7 @@
     const queue = JSON.parse(localStorage.getItem('offline_attendance_queue') || '[]');
     const badge = document.getElementById('queueBadge');
     badge.className = queue.length > 0 ? "status-pill pill-queue active" : "status-pill pill-queue";
-    badge.innerHTML = `<i data-lucide="refresh-cw" style="width: 14px;"></i> Queue: ${queue.length}`;
+    badge.innerHTML = `<i data-lucide="refresh-cw" style="width: 13px; height: 13px;"></i> Queue: ${queue.length}`;
     lucide.createIcons();
   }
 

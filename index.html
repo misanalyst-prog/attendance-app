@@ -250,7 +250,7 @@
   <div class="card-custom">
     <div class="text-center mb-4">
       <h5 class="fw-bold m-0">Attendance & Leave Portal</h5>
-      <p class="text-muted small m-0 mt-1">Multi-Date Leave & Fast Sync</p>
+      <p class="text-muted small m-0 mt-1">Direct Sync & Offline Support</p>
     </div>
 
     <form id="attendanceForm">
@@ -265,7 +265,7 @@
       <div class="mb-3">
         <label class="form-label">Project <span class="text-danger">*</span></label>
         <select id="project" class="form-select" onchange="onProjectChange()" required>
-          <option value="">-- Select Project --</option>
+          <option value="">-- Loading Projects --</option>
         </select>
       </div>
 
@@ -393,7 +393,7 @@
 
 <script>
   // INSERT YOUR GOOGLE APPS SCRIPT WEB APP URL HERE
-  const GAS_API_URL = "https://script.google.com/macros/s/AKfycbyLEMc5wnhuEbJXp7hP5Pmxhs4kKRU5LZABFqyd4ZnqJaWjJaVqUJhnqMFZPhXGUhFO-g/exec";
+  const GAS_API_URL = "YOUR_DEPLOYED_WEB_APP_URL_HERE";
 
   let masterRoster = [];
   let map = null;
@@ -401,6 +401,7 @@
   let capturedLat = null;
   let capturedLng = null;
   let datePickerInstance = null;
+  let isTimeTamperedOffline = false;
 
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('./sw.js').then(reg => reg.update());
@@ -415,7 +416,14 @@
     initLeafletMap();
     initDatePicker();
     fetchGPSLocation();
+    
+    // Load roster data from local storage first; update from server if online
     loadRosterData();
+    
+    // Check for offline sync queue on page load
+    if (navigator.onLine) {
+      syncOfflineQueue();
+    }
   });
 
   window.addEventListener('online', () => {
@@ -447,47 +455,27 @@
     }
   }
 
+  // --- OFFLINE & REAL-TIME CLOCK / TAMPER CHECK ---
   function initClock() {
     updateClock();
     setInterval(updateClock, 1000);
   }
 
   function updateClock() {
+    const now = Date.now();
+    const lastSeen = parseInt(localStorage.getItem('sys_last_seen_time') || '0', 10);
+
+    // Detect if phone clock was manually moved backward by more than 30 seconds
+    if (lastSeen > 0 && now < lastSeen - 30000) {
+      isTimeTamperedOffline = true;
+    } else {
+      localStorage.setItem('sys_last_seen_time', now.toString());
+    }
+
     const d = new Date();
     const pad = n => String(n).padStart(2, '0');
     const formatted = `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
     document.getElementById('timeDisplay').value = formatted;
-  }
-
-  function checkLocalDuplicates(record) {
-    const localLogs = JSON.parse(localStorage.getItem('submitted_logs_history') || '[]');
-    
-    if (record.type === 'Leave') {
-      const leaveDates = record.leaveDates || [];
-      const duplicateDate = leaveDates.find(dateStr => {
-        return localLogs.some(item => 
-          item.fullName.trim().toLowerCase() === record.fullName.trim().toLowerCase() && 
-          item.date === dateStr
-        );
-      });
-
-      if (duplicateDate) {
-        return { valid: false, message: `Leave is already submitted for the selected date (${duplicateDate}).` };
-      }
-    }
-    return { valid: true };
-  }
-
-  function saveLocalLogHistory(record) {
-    let localLogs = JSON.parse(localStorage.getItem('submitted_logs_history') || '[]');
-    if (record.type === 'Leave' && record.leaveDates) {
-      record.leaveDates.forEach(d => {
-        localLogs.push({ fullName: record.fullName, date: d, type: 'Leave' });
-      });
-    } else {
-      localLogs.push({ fullName: record.fullName, date: record.time.split(' ')[0], type: record.type });
-    }
-    localStorage.setItem('submitted_logs_history', JSON.stringify(localLogs));
   }
 
   function initLeafletMap() {
@@ -515,7 +503,7 @@
         else mapMarker = L.marker(latLng).addTo(map);
       },
       () => { locInput.value = "GPS Access Denied / Unavailable"; },
-      { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
     );
   }
 
@@ -533,26 +521,33 @@
     badge.textContent = `Sync Queue: ${queue.length}`;
   }
 
+  // --- DROPDOWN ROSTER CACHING (FIRST-LOAD LOCAL STORAGE) ---
   function loadRosterData() {
+    const cachedRoster = localStorage.getItem('employee_roster_cache');
+    
+    if (cachedRoster) {
+      // Instant render from local storage
+      masterRoster = JSON.parse(cachedRoster);
+      initProjectDropdown();
+    }
+
+    // Refresh roster from server when online
     if (navigator.onLine) {
-      fetchWithTimeout(GAS_API_URL, { method: 'POST', body: JSON.stringify({ action: 'getEmployees' }) }, 7000)
+      fetch(GAS_API_URL, {
+        method: 'POST',
+        body: JSON.stringify({ action: 'getEmployees' })
+      })
       .then(res => res.json())
       .then(res => {
-        if (res.status === 'SUCCESS' && res.employees) {
+        if (res.status === 'SUCCESS' && res.employees && res.employees.length > 0) {
           masterRoster = res.employees;
           localStorage.setItem('employee_roster_cache', JSON.stringify(masterRoster));
           initProjectDropdown();
-        } else { loadRosterFromCache(); }
+        }
       })
-      .catch(() => loadRosterFromCache());
-    } else { loadRosterFromCache(); }
-  }
-
-  function loadRosterFromCache() {
-    const cache = localStorage.getItem('employee_roster_cache');
-    if (cache) {
-      masterRoster = JSON.parse(cache);
-      initProjectDropdown();
+      .catch(() => {
+        // Retain existing cached roster if fetch fails
+      });
     }
   }
 
@@ -613,17 +608,14 @@
     el.innerHTML = `<option value="">${placeholder}</option>` + items.map(i => `<option value="${i}">${i}</option>`).join('');
   }
 
-  // --- FAST TIMEOUT FETCH WRAPPER FOR POOR CONNECTIONS ---
-  function fetchWithTimeout(url, options, timeoutMs = 7000) {
-    const controller = new AbortController();
-    const id = setTimeout(() => controller.abort(), timeoutMs);
-    return fetch(url, { ...options, signal: controller.signal })
-      .finally(() => clearTimeout(id));
-  }
-
-  // --- FORM SUBMISSION ---
+  // --- FORM SUBMISSION LOGIC ---
   document.getElementById('attendanceForm').addEventListener('submit', function(e) {
     e.preventDefault();
+
+    if (isTimeTamperedOffline) {
+      showPopup("Time Tampering Detected", "Your device clock was turned backward. Please re-enable automatic network date and time.", "error");
+      return;
+    }
 
     const email = document.getElementById('userEmail').value.trim();
     const locVal = document.getElementById('locationDisplay').value;
@@ -641,6 +633,7 @@
     const desig = document.getElementById('designation').value;
     const type = document.querySelector('input[name="type"]:checked').value;
     const remarks = document.getElementById('remarks').value;
+    const currentTimeFormatted = document.getElementById('timeDisplay').value;
 
     let record = {
       uid: 'UID-' + Date.now(),
@@ -652,7 +645,8 @@
       fullName: name,
       designation: desig,
       type: type,
-      time: document.getElementById('timeDisplay').value,
+      time: currentTimeFormatted,
+      submissionTime: currentTimeFormatted,
       location: locVal,
       remarks: remarks
     };
@@ -669,76 +663,70 @@
       record.time = `${leaveDates[0]} 09:00:00`;
     }
 
-    // Check local duplicate cache first
-    const dupCheck = checkLocalDuplicates(record);
-    if (!dupCheck.valid) {
-      showPopup("Duplicate Leave", dupCheck.message, "warning");
-      return;
-    }
-
+    // IF ONLINE: Send directly to server without storing locally
     if (navigator.onLine) {
-      sendToServer(record);
+      sendToServerDirectly(record);
     } else {
-      saveLocally(record);
-      saveLocalLogHistory(record);
-      showPopup("Saved Offline", "Offline mode active. Record queued for background sync.", "success");
+      // IF OFFLINE: Queue locally in localStorage
+      saveLocallyOffline(record);
+      showPopup("Saved Offline", "No internet connection detected. Record queued locally and will sync automatically when online.", "warning");
       resetForm();
     }
   });
 
-  function sendToServer(record) {
+  function sendToServerDirectly(record) {
     const btn = document.getElementById('submitBtn');
     btn.disabled = true;
     btn.textContent = "Submitting...";
 
-    fetchWithTimeout(GAS_API_URL, {
+    fetch(GAS_API_URL, {
       method: 'POST',
       body: JSON.stringify({ action: 'submitAttendance', record: record })
-    }, 8000)
+    })
     .then(res => res.json())
     .then(res => {
       btn.disabled = false;
       btn.textContent = "Submit Request";
 
       if (res.status === 'SUCCESS') {
-        saveLocalLogHistory(record);
         showPopup("Success", `${record.type} recorded successfully for ${record.fullName}!`, "success");
         resetForm();
       } 
       else if (res.status === 'SUCCESS_LEAVE') {
-        saveLocalLogHistory(record);
         showPopup("Leave Submitted", res.message, "success");
         resetForm();
       }
       else if (res.status === 'DUPLICATE_LEAVE') {
-        showPopup("Leave Already Submitted", res.message, "warning");
+        showPopup("Duplicate Leave", res.message, "warning");
       }
       else if (res.status === 'VALIDATION_FAILED') {
         showPopup("Notice", res.message, "error");
       } else {
-        saveLocally(record);
-        showPopup("Saved Offline", "Server response delayed. Record queued locally.", "success");
+        // Network or execution issue fallback: queue offline
+        saveLocallyOffline(record);
+        showPopup("Queued Offline", "Server warning received. Record queued locally for retry.", "warning");
         resetForm();
       }
     })
     .catch(() => {
-      // Timeout or poor connection fallback
       btn.disabled = false;
       btn.textContent = "Submit Request";
-      saveLocally(record);
-      saveLocalLogHistory(record);
-      showPopup("Saved Offline", "Connection weak. Saved locally and queued for background sync.", "success");
+      
+      // If network drops mid-request, switch to offline storage safely
+      saveLocallyOffline(record);
+      showPopup("Saved Offline", "Connection interrupted. Record queued locally and will sync when reconnected.", "warning");
       resetForm();
     });
   }
 
-  function saveLocally(record) {
+  function saveLocallyOffline(record) {
     let queue = JSON.parse(localStorage.getItem('offline_attendance_queue') || '[]');
     queue.push(record);
     localStorage.setItem('offline_attendance_queue', JSON.stringify(queue));
     updateQueueBadge();
   }
 
+  // --- AUTOMATIC BACKGROUND SYNC WHEN CONNECTED ---
   async function syncOfflineQueue() {
     let queue = JSON.parse(localStorage.getItem('offline_attendance_queue') || '[]');
     if (queue.length === 0) return;
@@ -748,15 +736,14 @@
 
     for (const record of queue) {
       try {
-        const response = await fetchWithTimeout(GAS_API_URL, {
+        const response = await fetch(GAS_API_URL, {
           method: 'POST',
           body: JSON.stringify({ action: 'submitAttendance', record: record })
-        }, 8000);
+        });
         const res = await response.json();
         
         if (res.status === 'SUCCESS' || res.status === 'SUCCESS_LEAVE' || res.status === 'DUPLICATE_LEAVE' || res.status === 'VALIDATION_FAILED') {
           syncedCount++;
-          saveLocalLogHistory(record);
         } else {
           remainingQueue.push(record);
         }
@@ -765,11 +752,12 @@
       }
     }
 
+    // Update queue storage with remaining unsynced items
     localStorage.setItem('offline_attendance_queue', JSON.stringify(remainingQueue));
     updateQueueBadge();
 
     if (syncedCount > 0) {
-      showPopup("Sync Complete", `${syncedCount} queued record(s) processed. Duplicate dates were ignored.`, "success");
+      showPopup("Auto Sync Complete", `${syncedCount} offline record(s) automatically synced to the server.`, "success");
     }
   }
 

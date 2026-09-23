@@ -1,7 +1,8 @@
-const CACHE_NAME = 'attendance-v12';
+const CACHE_NAME = 'attendance-v13';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
+  './manifest.json',
   'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap',
   'https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css',
   'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css',
@@ -11,7 +12,6 @@ const ASSETS_TO_CACHE = [
   'https://cdn.jsdelivr.net/npm/flatpickr'
 ];
 
-// Install Event: Cache all essential files
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
@@ -20,7 +20,6 @@ self.addEventListener('install', (event) => {
   );
 });
 
-// Activate Event: Clean up old caches
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((cacheNames) => {
@@ -35,9 +34,7 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-// Fetch Event: Serve cached assets when offline
 self.addEventListener('fetch', (event) => {
-  // Do not intercept POST API calls to Google Apps Script
   if (event.request.method !== 'GET' || event.request.url.includes('script.google.com')) {
     return;
   }
@@ -45,18 +42,16 @@ self.addEventListener('fetch', (event) => {
   event.respondWith(
     caches.match(event.request).then((cachedResponse) => {
       if (cachedResponse) {
-        // Fetch fresh copy in background if online
         fetch(event.request).then((networkResponse) => {
           if (networkResponse.status === 200) {
             caches.open(CACHE_NAME).then((cache) => cache.put(event.request, networkResponse));
           }
-        }).catch(() => {/* Ignore network errors offline */});
+        }).catch(() => {});
 
         return cachedResponse;
       }
 
       return fetch(event.request).catch(() => {
-        // Fallback for offline HTML page
         if (event.request.headers.get('accept').includes('text/html')) {
           return caches.match('./index.html');
         }

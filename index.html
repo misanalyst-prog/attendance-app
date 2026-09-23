@@ -3,307 +3,399 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  
-  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-  <meta http-equiv="Pragma" content="no-cache">
-  <meta http-equiv="Expires" content="0">
-
   <title>Attendance & Leave Portal</title>
-  <link rel="manifest" href="manifest.json">
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
 
   <style>
     :root {
-      --bg-body: #f8fafc;
+      --bg-surface: #f4f6f9;
       --card-bg: #ffffff;
-      --text-main: #0f172a;
-      --text-muted: #64748b;
-      --primary: #2563eb;
-      --border-color: #e2e8f0;
+      --text-primary: #0f172a;
+      --text-secondary: #64748b;
+      --accent: #2563eb;
+      --accent-hover: #1d4ed8;
+      --border-subtle: #e2e8f0;
+      --radius-lg: 18px;
+      --radius-md: 12px;
+      --shadow-sm: 0 1px 3px rgba(0,0,0,0.05);
+      --shadow-md: 0 10px 25px -5px rgba(15, 23, 42, 0.08);
     }
 
     body {
-      font-family: 'Plus Jakarta Sans', sans-serif;
-      background-color: var(--bg-body);
-      color: var(--text-main);
-      padding-top: 16px;
-      padding-bottom: 40px;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background-color: var(--bg-surface);
+      color: var(--text-primary);
+      padding: 24px 12px;
+      min-height: 100vh;
     }
 
-    .app-container { max-width: 480px; margin: 0 auto; }
+    .portal-wrapper {
+      max-width: 460px;
+      margin: 0 auto;
+    }
 
-    .card-custom {
+    .portal-card {
       background: var(--card-bg);
-      border: 1px solid var(--border-color);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-md);
+      padding: 28px 24px;
+    }
+
+    .brand-header {
+      text-align: center;
+      margin-bottom: 24px;
+    }
+    .brand-header h1 {
+      font-size: 1.25rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      color: var(--text-primary);
+      margin: 0;
+    }
+    .brand-header p {
+      font-size: 0.82rem;
+      color: var(--text-secondary);
+      margin-top: 4px;
+    }
+
+    .status-strip {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+      padding: 6px 12px;
+      background: #f8fafc;
+      border: 1px solid var(--border-subtle);
+      border-radius: 30px;
+    }
+
+    .badge-pill {
+      font-size: 0.75rem;
+      font-weight: 600;
+      padding: 4px 10px;
       border-radius: 20px;
-      box-shadow: 0 4px 20px -2px rgba(15, 23, 42, 0.05);
-      padding: 24px 20px;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .badge-online { background: #dcfce7; color: #15803d; }
+    .badge-offline { background: #fef3c7; color: #b45309; }
+    .badge-queue { background: #f1f5f9; color: #475569; }
+    .badge-queue.active { background: #dbeafe; color: #1e40af; }
+
+    .form-group {
+      margin-bottom: 18px;
     }
 
-    .status-bar {
-      display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;
+    .form-label {
+      font-weight: 600;
+      font-size: 0.78rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--text-secondary);
+      margin-bottom: 6px;
+      display: block;
     }
 
-    .chip-badge {
-      font-size: 0.78rem; font-weight: 600; padding: 5px 12px; border-radius: 20px;
-      display: inline-flex; align-items: center; gap: 6px; border: 1px solid transparent;
+    .form-control, .form-select {
+      border-radius: var(--radius-md);
+      border: 1px solid var(--border-subtle);
+      padding: 10px 14px;
+      font-size: 0.9rem;
+      color: var(--text-primary);
+      background-color: #ffffff;
+      transition: all 0.15s ease-in-out;
     }
-    .chip-online { background-color: #f0fdf4; color: #166534; border-color: #bbf7d0; }
-    .chip-offline { background-color: #fffbeb; color: #92400e; border-color: #fef3c7; }
-    .chip-sync { background-color: #f1f5f9; color: #334155; border-color: #e2e8f0; }
-    .chip-sync.has-pending { background-color: #eff6ff; color: #1e40af; border-color: #bfdbfe; }
-
-    .action-btn-group {
-      display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px;
+    .form-control:focus, .form-select:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+    }
+    .form-control[readonly], .form-control:disabled, .form-select:disabled {
+      background-color: #f8fafc;
+      color: #64748b;
+      cursor: not-allowed;
     }
 
-    .btn-action-tile {
-      background: #ffffff; border: 1.5px solid var(--border-color); border-radius: 14px;
-      padding: 10px 12px; font-weight: 600; font-size: 0.82rem; color: #334155;
-      display: flex; align-items: center; justify-content: center; gap: 6px;
+    .email-locked-wrapper {
+      position: relative;
+    }
+    .email-lock-icon {
+      position: absolute;
+      right: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 0.85rem;
+      color: var(--text-secondary);
+    }
+
+    .segmented-picker {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      background: #f1f5f9;
+      padding: 4px;
+      border-radius: var(--radius-md);
+      gap: 4px;
+    }
+    .segmented-picker input[type="radio"] { display: none; }
+    .segmented-picker label {
+      text-align: center;
+      padding: 9px 6px;
+      font-weight: 600;
+      font-size: 0.82rem;
+      color: var(--text-secondary);
+      border-radius: 8px;
+      cursor: pointer;
       transition: all 0.2s ease;
+      margin: 0;
     }
-    .btn-action-tile:hover { background: #f8fafc; border-color: var(--primary); color: var(--primary); }
-
-    .form-label { font-weight: 600; font-size: 0.8rem; color: #334155; margin-bottom: 6px; }
-    .form-select, .form-control {
-      border-radius: 12px; border: 1.5px solid var(--border-color); padding: 11px 14px; font-size: 0.92rem;
+    .segmented-picker input[type="radio"]:checked + label {
+      background: #ffffff;
+      color: var(--accent);
+      box-shadow: var(--shadow-sm);
     }
-
-    .segmented-control {
-      display: flex; background-color: #f1f5f9; padding: 4px; border-radius: 14px; border: 1px solid var(--border-color); gap: 4px;
-    }
-    .segmented-control input[type="radio"] { display: none; }
-    .segmented-control label {
-      flex: 1; text-align: center; padding: 10px 8px; font-weight: 600; font-size: 0.84rem;
-      color: var(--text-muted); border-radius: 10px; cursor: pointer; margin: 0;
-    }
-    .segmented-control input[type="radio"]:checked + label {
-      background-color: var(--primary); color: #ffffff; box-shadow: 0 2px 8px rgba(37, 99, 235, 0.25);
-    }
-    .segmented-control input[id="typeLeave"]:checked + label {
-      background-color: #eab308 !important; color: #0f172a !important;
+    .segmented-picker input[id="typeLeave"]:checked + label {
+      color: #d97706;
     }
 
-    .leave-panel {
-      background-color: #fefce8; border: 1.5px solid #fef08a; border-radius: 14px; padding: 16px; margin-bottom: 16px; display: none;
+    .leave-container {
+      background: #fffbeb;
+      border: 1px solid #fef3c7;
+      border-radius: var(--radius-md);
+      padding: 16px;
+      margin-bottom: 18px;
+      display: none;
     }
 
-    #mapContainer { height: 140px; border-radius: 14px; border: 1.5px solid var(--border-color); margin-bottom: 1rem; }
-
-    .btn-submit { background-color: var(--primary); border: none; border-radius: 12px; padding: 13px; font-weight: 600; font-size: 0.98rem; color: #ffffff; }
-
-    .status-badge-pill {
-      font-size: 0.75rem; font-weight: 700; padding: 4px 10px; border-radius: 12px; display: inline-block;
+    .map-box {
+      height: 130px;
+      border-radius: var(--radius-md);
+      border: 1px solid var(--border-subtle);
+      margin-top: 8px;
+      overflow: hidden;
     }
-    .pill-green { background: #dcfce7; color: #15803d; }
-    .pill-orange { background: #ffedd5; color: #c2410c; }
-    .pill-yellow { background: #fef9c3; color: #a16207; }
-    .pill-red { background: #fee2e2; color: #b91c1c; }
 
-    .popup-backdrop {
-      position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
-      background: rgba(15, 23, 42, 0.5); backdrop-filter: blur(4px);
-      display: flex; align-items: center; justify-content: center; z-index: 9999;
-      opacity: 0; visibility: hidden; transition: all 0.2s ease; padding: 20px;
+    .gps-btn {
+      background: #ffffff;
+      border: 1px solid var(--border-subtle);
+      border-radius: 8px;
+      padding: 2px 8px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--text-secondary);
+      transition: background 0.15s;
     }
-    .popup-backdrop.active { opacity: 1; visibility: visible; }
-    .popup-card { background: #ffffff; border-radius: 20px; max-width: 380px; width: 100%; padding: 24px; text-align: center; }
-    .popup-icon { width: 44px; height: 44px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 20px; font-weight: bold; margin: 0 auto 14px auto; }
+    .gps-btn:hover { background: #f8fafc; color: var(--accent); }
+
+    .btn-submit {
+      background-color: var(--accent);
+      color: #ffffff;
+      border: none;
+      border-radius: var(--radius-md);
+      padding: 12px;
+      font-weight: 600;
+      font-size: 0.92rem;
+      width: 100%;
+      transition: background 0.2s ease;
+    }
+    .btn-submit:hover { background-color: var(--accent-hover); }
+
+    /* POPUP NOTIFICATION MODAL */
+    .popup-overlay {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(15, 23, 42, 0.4);
+      backdrop-filter: blur(3px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 10000;
+      opacity: 0;
+      visibility: hidden;
+      transition: all 0.2s ease;
+      padding: 20px;
+    }
+    .popup-overlay.active { opacity: 1; visibility: visible; }
+    .popup-box {
+      background: #ffffff;
+      border-radius: var(--radius-lg);
+      max-width: 360px;
+      width: 100%;
+      padding: 24px;
+      text-align: center;
+      box-shadow: var(--shadow-md);
+    }
+    .popup-icon {
+      width: 42px; height: 42px;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px; font-weight: bold;
+      margin: 0 auto 12px auto;
+    }
     .popup-error .popup-icon { background: #fee2e2; color: #dc2626; }
     .popup-warning .popup-icon { background: #fef3c7; color: #b45309; }
     .popup-success .popup-icon { background: #dcfce7; color: #166534; }
-    .popup-btn { border: none; border-radius: 10px; padding: 10px 18px; font-weight: 600; width: 100%; margin-top: 16px; }
-    .popup-error .popup-btn { background: #dc2626; color: white; }
-    .popup-warning .popup-btn { background: #b45309; color: white; }
-    .popup-success .popup-btn { background: #166534; color: white; }
+    .popup-action-btn {
+      border: none;
+      border-radius: 10px;
+      padding: 10px;
+      font-weight: 600;
+      font-size: 0.88rem;
+      width: 100%;
+      margin-top: 16px;
+    }
+    .popup-error .popup-action-btn { background: #dc2626; color: white; }
+    .popup-warning .popup-action-btn { background: #b45309; color: white; }
+    .popup-success .popup-action-btn { background: #166534; color: white; }
   </style>
 </head>
 <body>
 
-<div class="container app-container">
-
-  <div class="status-bar">
-    <span id="networkStatus" class="chip-badge chip-online">● Online</span>
-    <span id="queueStatus" class="chip-badge chip-sync">Sync Queue: 0</span>
+<div class="portal-wrapper">
+  
+  <div class="status-strip">
+    <span id="networkBadge" class="badge-pill badge-online">● Online</span>
+    <span id="queueBadge" class="badge-pill badge-queue">Sync Queue: 0</span>
   </div>
 
-  <div class="card-custom">
-    <div class="text-center mb-3">
-      <h5 class="fw-bold m-0">Attendance & Leave Portal</h5>
-      <p class="text-muted small m-0 mt-1">Local Validation Engine</p>
-    </div>
-
-    <!-- Quick Action Buttons -->
-    <div class="action-btn-group">
-      <button type="button" class="btn-action-tile" onclick="openTodayStatusModal()">
-        📅 Today's Status
-      </button>
-      <button type="button" class="btn-action-tile" onclick="openMonthlyLeavesModal()">
-        🏖️ Monthly Leaves
-      </button>
+  <div class="portal-card">
+    
+    <div class="brand-header">
+      <h1>Attendance & Leave Portal</h1>
+      <p>Automated Verification Engine</p>
     </div>
 
     <form id="attendanceForm">
       
-      <div class="mb-3">
-        <label class="form-label">Official Email Address <span class="text-danger">*</span></label>
-        <input type="email" id="userEmail" class="form-control" placeholder="name@organization.com" required onchange="localStorage.setItem('saved_user_email', this.value)">
+      <!-- EMAIL (AUTOMATICALLY FETCHED & READONLY) -->
+      <div class="form-group">
+        <label class="form-label">Official Email Address</label>
+        <div class="email-locked-wrapper">
+          <input type="email" id="userEmail" class="form-control" placeholder="Detecting email address..." readonly required>
+          <span class="email-lock-icon">🔒</span>
+        </div>
       </div>
 
-      <div class="mb-3">
+      <!-- ROSTER DROPDOWNS -->
+      <div class="form-group">
         <label class="form-label">Project <span class="text-danger">*</span></label>
         <select id="project" class="form-select" onchange="onProjectChange()" required>
           <option value="">-- Loading Projects --</option>
         </select>
       </div>
 
-      <div class="mb-3">
+      <div class="form-group">
         <label class="form-label">Organization <span class="text-danger">*</span></label>
         <select id="organization" class="form-select" onchange="onOrganizationChange()" required disabled>
           <option value="">-- Select Project First --</option>
         </select>
       </div>
 
-      <div class="mb-3">
+      <div class="form-group">
         <label class="form-label">District <span class="text-danger">*</span></label>
         <select id="district" class="form-select" onchange="onDistrictChange()" required disabled>
           <option value="">-- Select Organization First --</option>
         </select>
       </div>
 
-      <div class="mb-3">
+      <div class="form-group">
         <label class="form-label">Union Council <span class="text-danger">*</span></label>
         <select id="unionCouncil" class="form-select" onchange="onUnionCouncilChange()" required disabled>
           <option value="">-- Select District First --</option>
         </select>
       </div>
 
-      <div class="mb-3">
+      <div class="form-group">
         <label class="form-label">Full Name <span class="text-danger">*</span></label>
         <select id="fullName" class="form-select" onchange="onFullNameChange()" required disabled>
           <option value="">-- Select Union Council First --</option>
         </select>
       </div>
 
-      <div class="mb-3">
+      <div class="form-group">
         <label class="form-label">Designation <span class="text-danger">*</span></label>
         <select id="designation" class="form-select" required disabled>
           <option value="">-- Select Full Name First --</option>
         </select>
       </div>
 
-      <div class="mb-3">
-        <label class="form-label d-block">Attendance Type <span class="text-danger">*</span></label>
-        <div class="segmented-control">
-          <input type="radio" name="type" id="typeIn" value="Check-In" checked onchange="toggleAttendanceType()">
+      <!-- ATTENDANCE TYPE SELECTOR -->
+      <div class="form-group">
+        <label class="form-label">Submission Type <span class="text-danger">*</span></label>
+        <div class="segmented-picker">
+          <input type="radio" name="type" id="typeIn" value="Check-In" checked onchange="toggleType()">
           <label for="typeIn">Check-In</label>
           
-          <input type="radio" name="type" id="typeOut" value="Check-Out" onchange="toggleAttendanceType()">
+          <input type="radio" name="type" id="typeOut" value="Check-Out" onchange="toggleType()">
           <label for="typeOut">Check-Out</label>
 
-          <input type="radio" name="type" id="typeLeave" value="Leave" onchange="toggleAttendanceType()">
+          <input type="radio" name="type" id="typeLeave" value="Leave" onchange="toggleType()">
           <label for="typeLeave">Leave</label>
         </div>
       </div>
 
       <!-- LEAVE PANEL -->
-      <div id="leavePanel" class="leave-panel">
+      <div id="leaveContainer" class="leave-container">
         <div class="mb-3">
-          <label class="form-label">Leave Category <span class="text-danger">*</span></label>
+          <label class="form-label">Leave Category</label>
           <select id="leaveCategory" class="form-select">
             <option value="Casual Leave">Casual Leave</option>
             <option value="Annual Leave">Annual Leave</option>
             <option value="Sick / Medical Leave">Sick / Medical Leave</option>
             <option value="Maternity Leave">Maternity Leave</option>
             <option value="Paternity Leave">Paternity Leave</option>
-            <option value="Compassionate / Bereavement Leave">Compassionate / Bereavement Leave</option>
-            <option value="Unpaid / Without Pay Leave">Unpaid / Without Pay Leave</option>
+            <option value="Compassionate Leave">Compassionate Leave</option>
+            <option value="Unpaid Leave">Unpaid Leave</option>
             <option value="Other">Other</option>
           </select>
         </div>
 
-        <div class="mb-0">
-          <label class="form-label">Select Leave Date(s) <span class="text-danger">*</span></label>
+        <div>
+          <label class="form-label">Select Date(s)</label>
           <input type="text" id="leaveDatesPicker" class="form-control" placeholder="Tap to select dates">
         </div>
       </div>
 
-      <div class="mb-3" id="timeFieldContainer">
-        <label class="form-label">Current Date & Time</label>
+      <!-- TIME DISPLAY -->
+      <div class="form-group" id="timeContainer">
+        <label class="form-label">Timestamp</label>
         <input type="text" id="timeDisplay" class="form-control" readonly placeholder="Capturing time...">
       </div>
 
-      <div class="mb-2">
+      <!-- HIGH PRECISION GPS LOCATION -->
+      <div class="form-group">
         <div class="d-flex justify-content-between align-items-center mb-1">
-          <label class="form-label m-0">Location</label>
-          <button type="button" class="btn-refresh-icon" style="background:#f1f5f9; border:1px solid #e2e8f0; border-radius:8px; padding:2px 8px;" onclick="fetchGPSLocation()">🔄</button>
+          <label class="form-label mb-0">GPS Location</label>
+          <button type="button" class="gps-btn" onclick="fetchGPSLocation(true)">🔄 High-Accuracy GPS</button>
         </div>
-        <input type="text" id="locationDisplay" class="form-control" readonly placeholder="Acquiring GPS coordinates...">
+        <input type="text" id="locationDisplay" class="form-control" readonly placeholder="Acquiring precision GPS location...">
+        <div id="mapContainer" class="map-box"></div>
       </div>
 
-      <div id="mapContainer"></div>
-
-      <div class="mb-4">
+      <!-- REMARKS -->
+      <div class="form-group mb-4">
         <label class="form-label">Remarks <span class="text-muted fw-normal">(Optional)</span></label>
-        <textarea id="remarks" class="form-control" rows="2" placeholder="Write any optional notes..."></textarea>
+        <textarea id="remarks" class="form-control" rows="2" placeholder="Add optional notes..."></textarea>
       </div>
 
-      <button type="submit" id="submitBtn" class="btn btn-submit w-100">Submit Request</button>
+      <button type="submit" id="submitBtn" class="btn-submit">Submit Entry</button>
     </form>
   </div>
 </div>
 
-<!-- TODAY STATUS MODAL -->
-<div class="modal fade" id="todayStatusModal" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog modal-dialog-centered">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h6 class="modal-title fw-bold">📅 Today's Attendance & Leave Status</h6>
-        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-      </div>
-      <div class="modal-body">
-        <div id="todayStatusContent">
-          <p class="text-muted small text-center mb-0">Please select Full Name first to view status.</p>
-        </div>
-      </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-sm btn-secondary w-100" data-bs-dismiss="modal">Close</button>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- MONTHLY LEAVES MODAL -->
-<div class="modal fade" id="monthlyLeavesModal" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog modal-dialog-centered">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h6 class="modal-title fw-bold">🏖️ Applied Leaves (Current Month)</h6>
-        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-      </div>
-      <div class="modal-body">
-        <div id="monthlyLeavesContent">
-          <p class="text-muted small text-center mb-0">Please select Full Name first to view monthly leaves.</p>
-        </div>
-      </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-sm btn-secondary w-100" data-bs-dismiss="modal">Close</button>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- ALERT POPUP -->
-<div id="popupModal" class="popup-backdrop popup-error">
-  <div class="popup-card">
+<!-- POPUP MODAL -->
+<div id="popupModal" class="popup-overlay popup-error">
+  <div class="popup-box">
     <div id="popupIcon" class="popup-icon">!</div>
     <h6 id="popupTitle" class="fw-bold mb-2">Notice</h6>
     <p id="popupMessage" class="text-muted small mb-0"></p>
-    <button type="button" class="popup-btn" onclick="closePopup()">Acknowledge</button>
+    <button type="button" class="popup-action-btn" onclick="closePopup()">Acknowledge</button>
   </div>
 </div>
 
@@ -312,6 +404,7 @@
 <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
 
 <script>
+  // Paste your deployed Google Apps Script Web App URL here if hosting standalone:
   const GAS_API_URL = "https://script.google.com/macros/s/AKfycbyLEMc5wnhuEbJXp7hP5Pmxhs4kKRU5LZABFqyd4ZnqJaWjJaVqUJhnqMFZPhXGUhFO-g/exec";
 
   let masterRoster = [];
@@ -319,10 +412,8 @@
   let datePickerInstance = null;
 
   window.addEventListener('load', () => {
-    const savedEmail = localStorage.getItem('saved_user_email');
-    if (savedEmail) document.getElementById('userEmail').value = savedEmail;
-
-    pruneLocalCache(); // Purge outdated daily check-in/out logs on load
+    pruneLocalCache();
+    initUserEmail();
     updateNetworkStatus();
     initClock();
     initLeafletMap();
@@ -336,6 +427,107 @@
   window.addEventListener('online', () => { updateNetworkStatus(); syncOfflineQueue(); });
   window.addEventListener('offline', updateNetworkStatus);
 
+  /* AUTOMATIC USER EMAIL DETECTOR */
+  function initUserEmail() {
+    // If rendered directly by Google Apps Script HtmlService template:
+    const injectedEmail = "<?= userEmail ?>"; 
+    
+    if (injectedEmail && !injectedEmail.includes("<?= ")) {
+      setEmailField(injectedEmail);
+      return;
+    }
+
+    // Try localStorage fallback
+    const cachedEmail = localStorage.getItem('cached_user_email');
+    if (cachedEmail) setEmailField(cachedEmail);
+
+    // Fetch from backend API session if connected
+    if (navigator.onLine && GAS_API_URL !== "YOUR_DEPLOYED_WEB_APP_URL_HERE") {
+      fetch(GAS_API_URL, {
+        method: 'POST',
+        body: JSON.stringify({ action: 'getUserContext' })
+      })
+      .then(r => r.json())
+      .then(res => {
+        if (res.status === 'SUCCESS' && res.email) {
+          setEmailField(res.email);
+        }
+      })
+      .catch(() => {});
+    }
+  }
+
+  function setEmailField(email) {
+    const emailInput = document.getElementById('userEmail');
+    emailInput.value = email;
+    localStorage.setItem('cached_user_email', email);
+  }
+
+  /* HIGH-PRECISION GPS LOCATION WITH OFFLINE CACHING & ACCURACY DISPLAY */
+  function fetchGPSLocation(forceRefresh = false) {
+    const locInput = document.getElementById('locationDisplay');
+    locInput.value = "Acquiring precision GPS location...";
+
+    // Use offline cached GPS position if available and network is offline
+    if (!navigator.onLine && !forceRefresh) {
+      const cachedLoc = localStorage.getItem('cached_last_gps');
+      if (cachedLoc) {
+        locInput.value = cachedLoc + " (Offline Cache)";
+        const parts = cachedLoc.split('(')[0].split(',');
+        if (parts.length === 2) updateMapMarker(parseFloat(parts[0]), parseFloat(parts[1]));
+        return;
+      }
+    }
+
+    if (!("geolocation" in navigator)) {
+      locInput.value = "GPS Not Supported";
+      return;
+    }
+
+    const geoOptions = {
+      enableHighAccuracy: true, // Force hardware GPS sensor
+      timeout: 15000,           // Allow up to 15s for satellites lock
+      maximumAge: forceRefresh ? 0 : 5000
+    };
+
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const lat = pos.coords.latitude.toFixed(6);
+        const lng = pos.coords.longitude.toFixed(6);
+        const accuracy = Math.round(pos.coords.accuracy);
+        
+        const formattedLoc = `${lat}, ${lng} (±${accuracy}m accuracy)`;
+        locInput.value = formattedLoc;
+
+        // Cache precision coordinates for offline fallback
+        localStorage.setItem('cached_last_gps', formattedLoc);
+        updateMapMarker(parseFloat(lat), parseFloat(lng));
+      },
+      (err) => {
+        const cachedLoc = localStorage.getItem('cached_last_gps');
+        if (cachedLoc) {
+          locInput.value = cachedLoc + " (Cached - GPS Timeout)";
+        } else {
+          locInput.value = `GPS Error: ${err.message || 'Position Unavailable'}`;
+        }
+      },
+      geoOptions
+    );
+  }
+
+  function initLeafletMap() {
+    map = L.map('mapContainer', { zoomControl: false }).setView([20.0, 0.0], 2);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
+  }
+
+  function updateMapMarker(lat, lng) {
+    if (!map) return;
+    map.setView([lat, lng], 16);
+    if (mapMarker) mapMarker.setLatLng([lat, lng]);
+    else mapMarker = L.marker([lat, lng]).addTo(map);
+  }
+
+  /* LOCAL CACHE & VALIDATION RULES (INTERNAL ONLY) */
   function getTodayStr() {
     const d = new Date();
     const pad = n => String(n).padStart(2, '0');
@@ -348,14 +540,11 @@
     return `${pad(d.getMonth() + 1)}/${d.getFullYear()}`;
   }
 
-  /* LOCAL CACHE & RETENTION MANAGEMENT */
   function getLocalLogs() {
     return JSON.parse(localStorage.getItem('user_attendance_logs') || '[]');
   }
 
-  // ENFORCED RETENTION RULE:
-  // - Check-In / Check-Out: Saved ONLY for current date
-  // - Leave: Saved for complete current month
+  // Retention Enforcement: Check-In/Out kept for CURRENT DAY; Leaves for CURRENT MONTH
   function pruneLocalCache() {
     let logs = getLocalLogs();
     const todayStr = getTodayStr();
@@ -367,7 +556,7 @@
         const dateParts = r.time.split(' ')[0].split('/');
         return dateParts.length === 3 && `${dateParts[1]}/${dateParts[2]}` === currentMY;
       } else {
-        return r.time.startsWith(todayStr); // Only keep Check-In/Check-Out for today
+        return r.time.startsWith(todayStr);
       }
     });
 
@@ -382,155 +571,23 @@
     pruneLocalCache();
   }
 
-  function fetchServerMonthSummary(fullName) {
-    if (!navigator.onLine || GAS_API_URL.includes("YOUR_DEPLOYED")) return;
-
-    const todayStr = getTodayStr();
-    const currentMY = getCurrentMonthYearStr();
-
-    fetch(GAS_API_URL, {
-      method: 'POST',
-      body: JSON.stringify({
-        action: 'getUserMonthSummary',
-        fullName: fullName,
-        monthYear: currentMY
-      })
-    })
-    .then(res => res.json())
-    .then(res => {
-      if (res.status === 'SUCCESS' && Array.isArray(res.records)) {
-        let localLogs = getLocalLogs();
-
-        // Filter incoming server records: Check-In/Out ONLY for today; Leaves for current month
-        const validServerRecords = res.records.filter(r => {
-          const isLeave = r.type && r.type.startsWith('Leave');
-          if (isLeave) return true;
-          return r.time.startsWith(todayStr);
-        });
-
-        validServerRecords.forEach(serverRec => {
-          const exists = localLogs.some(l => 
-            l.fullName.toLowerCase() === serverRec.fullName.toLowerCase() && 
-            l.time === serverRec.time && 
-            l.type === serverRec.type
-          );
-          if (!exists) localLogs.push(serverRec);
-        });
-
-        localStorage.setItem('user_attendance_logs', JSON.stringify(localLogs));
-        pruneLocalCache();
-      }
-    })
-    .catch(() => {});
-  }
-
-  /* MODAL DISPLAY LOGIC */
-  function openTodayStatusModal() {
-    const fullName = document.getElementById('fullName').value;
-    const contentEl = document.getElementById('todayStatusContent');
-    
-    if (!fullName) {
-      contentEl.innerHTML = `<p class="text-danger small text-center mb-0">Please select an Employee Full Name first.</p>`;
-      new bootstrap.Modal(document.getElementById('todayStatusModal')).show();
-      return;
-    }
-
-    const todayStr = getTodayStr();
-    const logs = pruneLocalCache().filter(r => r.fullName.toLowerCase() === fullName.toLowerCase() && r.time.startsWith(todayStr));
-
-    const checkInRecord = logs.find(r => r.type === 'Check-In');
-    const checkOutRecord = logs.find(r => r.type === 'Check-Out');
-    const leaveRecord = logs.find(r => r.type.startsWith('Leave'));
-
-    let html = `<div class="p-2">
-      <div class="fw-bold mb-2 text-center text-primary">${fullName}</div>
-      <div class="small text-muted text-center mb-3">Date: ${todayStr}</div>
-      
-      <div class="list-group list-group-flush border-top border-bottom">
-        <div class="list-group-item d-flex justify-content-between align-items-center px-0">
-          <span>Check-In Status</span>
-          ${checkInRecord 
-            ? `<span class="status-badge-pill pill-green">Checked-In (${checkInRecord.time.split(' ')[1]})</span>`
-            : `<span class="status-badge-pill pill-red">Not Checked-In</span>`}
-        </div>
-        
-        <div class="list-group-item d-flex justify-content-between align-items-center px-0">
-          <span>Check-Out Status</span>
-          ${checkOutRecord 
-            ? `<span class="status-badge-pill pill-green">Checked-Out (${checkOutRecord.time.split(' ')[1]})</span>`
-            : `<span class="status-badge-pill pill-orange">Not Checked-Out</span>`}
-        </div>
-
-        <div class="list-group-item d-flex justify-content-between align-items-center px-0">
-          <span>Leave Applied Today</span>
-          ${leaveRecord 
-            ? `<span class="status-badge-pill pill-yellow">${leaveRecord.type}</span>`
-            : `<span class="status-badge-pill pill-green">No Leave Today</span>`}
-        </div>
-      </div>
-    </div>`;
-
-    contentEl.innerHTML = html;
-    new bootstrap.Modal(document.getElementById('todayStatusModal')).show();
-  }
-
-  function openMonthlyLeavesModal() {
-    const fullName = document.getElementById('fullName').value;
-    const contentEl = document.getElementById('monthlyLeavesContent');
-
-    if (!fullName) {
-      contentEl.innerHTML = `<p class="text-danger small text-center mb-0">Please select an Employee Full Name first.</p>`;
-      new bootstrap.Modal(document.getElementById('monthlyLeavesModal')).show();
-      return;
-    }
-
-    const currentMY = getCurrentMonthYearStr();
-    const logs = pruneLocalCache().filter(r => {
-      if (r.fullName.toLowerCase() !== fullName.toLowerCase() || !r.type.startsWith('Leave')) return false;
-      const parts = r.time.split(' ')[0].split('/');
-      return parts.length === 3 && `${parts[1]}/${parts[2]}` === currentMY;
-    });
-
-    if (logs.length === 0) {
-      contentEl.innerHTML = `<div class="text-center p-3">
-        <span class="fs-4">🏖️</span>
-        <p class="text-muted small mt-2 mb-0">No leave records found for ${fullName} in current month (${currentMY}).</p>
-      </div>`;
-    } else {
-      let rowsHtml = logs.map(l => `
-        <div class="p-2 mb-2 bg-light rounded border d-flex justify-content-between align-items-center">
-          <div>
-            <div class="fw-bold small">${l.time.split(' ')[0]}</div>
-            <div class="text-muted" style="font-size: 0.75rem;">${l.type}</div>
-          </div>
-          <span class="status-badge-pill pill-yellow">Applied</span>
-        </div>
-      `).join('');
-
-      contentEl.innerHTML = `<div class="small fw-bold mb-2 text-center text-primary">${fullName} (${logs.length} Leave(s))</div>` + rowsHtml;
-    }
-
-    new bootstrap.Modal(document.getElementById('monthlyLeavesModal')).show();
-  }
-
-  /* PRE-SUBMISSION LOCAL VALIDATION RULES */
   function validateLocally(record) {
     const todayStr = getTodayStr();
     const logs = pruneLocalCache().filter(r => r.fullName.toLowerCase() === record.fullName.toLowerCase());
 
-    // 1. Leave Check (Full Month Scope)
+    // Rule 1: Leave Check (Full Month Scope)
     if (record.type === 'Leave') {
       const leaveDates = record.leaveDates || [];
       for (let targetDate of leaveDates) {
         const hasLeave = logs.some(r => r.time.startsWith(targetDate) && r.type.startsWith('Leave'));
         if (hasLeave) {
-          return { valid: false, title: "Leave Already Submitted", message: `Leave record already exists for ${record.fullName} on ${targetDate}.` };
+          return { valid: false, title: "Leave Conflict", message: `Leave record already exists for ${record.fullName} on ${targetDate}.` };
         }
       }
       return { valid: true };
     }
 
-    // 2. Attendance Check (Current Date Scope)
+    // Rule 2: Attendance Check (Current Date Scope)
     const todayLogs = logs.filter(r => r.time.startsWith(todayStr));
     const hasLeaveToday = todayLogs.some(r => r.type.startsWith('Leave'));
     const hasCheckInToday = todayLogs.some(r => r.type === 'Check-In');
@@ -543,34 +600,39 @@
     if (record.type === 'Check-In') {
       const now = new Date();
       if (now.getHours() > 9 || (now.getHours() === 9 && (now.getMinutes() > 0 || now.getSeconds() > 0))) {
-        return { valid: false, title: "Check-In Denied", message: "Check-In time window closes strictly at 9:00 AM." };
+        return { valid: false, title: "Check-In Window Closed", message: "Check-In time window closes strictly at 09:00 AM." };
       }
       if (hasCheckInToday) {
-        return { valid: false, title: "Check-In Denied", message: `${record.fullName} has already checked in today (${todayStr}).` };
+        return { valid: false, title: "Already Checked-In", message: `${record.fullName} has already checked in for today (${todayStr}).` };
       }
     }
 
     if (record.type === 'Check-Out') {
       if (!hasCheckInToday) {
-        return { valid: false, title: "Check-Out Denied", message: `${record.fullName} has no Check-In record for today (${todayStr}). You must Check-In first.` };
+        return { valid: false, title: "Check-Out Denied", message: `No Check-In record found for ${record.fullName} today (${todayStr}). You must Check-In first.` };
       }
       if (hasCheckOutToday) {
-        return { valid: false, title: "Check-Out Denied", message: `${record.fullName} has already checked out today (${todayStr}).` };
+        return { valid: false, title: "Already Checked-Out", message: `${record.fullName} has already checked out for today (${todayStr}).` };
       }
     }
 
     return { valid: true };
   }
 
-  /* FORM SUBMIT HANDLER */
+  /* FORM SUBMISSION HANDLING */
   document.getElementById('attendanceForm').addEventListener('submit', function(e) {
     e.preventDefault();
 
     const email = document.getElementById('userEmail').value.trim();
     const locVal = document.getElementById('locationDisplay').value;
 
-    if (!email || !locVal || locVal.includes("Acquiring") || locVal.includes("Denied")) {
-      showPopup("Form Incomplete", "Please provide a valid email and GPS location.", "error");
+    if (!email) {
+      showPopup("Email Missing", "Could not detect active user email.", "error");
+      return;
+    }
+
+    if (!locVal || locVal.includes("Acquiring") || locVal.includes("Error")) {
+      showPopup("Location Error", "Please refresh high-accuracy GPS position before submitting.", "error");
       return;
     }
 
@@ -603,7 +665,7 @@
     if (type === 'Leave') {
       const selectedDatesStr = document.getElementById('leaveDatesPicker').value;
       if (!selectedDatesStr) {
-        showPopup("Missing Dates", "Please select at least one leave date on the calendar.", "warning");
+        showPopup("Dates Required", "Please select leave date(s) on the calendar picker.", "warning");
         return;
       }
       const leaveDates = selectedDatesStr.split(', ').map(d => d.trim());
@@ -612,14 +674,14 @@
       record.time = `${leaveDates[0]} 09:00:00`;
     }
 
-    // RUN LOCAL VALIDATION RULES FIRST
+    // Validation Check against local cache
     const localCheck = validateLocally(record);
     if (!localCheck.valid) {
       showPopup(localCheck.title, localCheck.message, "error");
       return;
     }
 
-    // UPDATE LOCAL STATE IMMEDIATELY FOR INSTANT FEEDBACK
+    // Commit to internal validation cache
     if (type === 'Leave') {
       record.leaveDates.forEach(d => {
         saveLocalLog({ ...record, type: `Leave (${record.leaveCategory})`, time: `${d} 09:00:00` });
@@ -628,11 +690,11 @@
       saveLocalLog(record);
     }
 
-    if (navigator.onLine) {
+    if (navigator.onLine && GAS_API_URL !== "YOUR_DEPLOYED_WEB_APP_URL_HERE") {
       sendToServerDirectly(record);
     } else {
       saveLocallyOffline(record);
-      showPopup("Saved Offline", "No internet connection detected. Record queued locally and will sync when online.", "warning");
+      showPopup("Saved Offline", "No active connection. Entry queued locally and will sync automatically when online.", "warning");
       resetForm();
     }
   });
@@ -649,22 +711,22 @@
     .then(res => res.json())
     .then(res => {
       btn.disabled = false;
-      btn.textContent = "Submit Request";
+      btn.textContent = "Submit Entry";
 
       if (res.status === 'SUCCESS' || res.status === 'SUCCESS_LEAVE') {
-        showPopup("Success", `Record saved successfully for ${record.fullName}!`, "success");
+        showPopup("Submitted Successfully", `Entry recorded for ${record.fullName}.`, "success");
         resetForm();
       } else {
         saveLocallyOffline(record);
-        showPopup("Queued Offline", res.message || "Server warning received. Queued locally for retry.", "warning");
+        showPopup("Queued Offline", res.message || "Server issue encountered. Saved locally.", "warning");
         resetForm();
       }
     })
     .catch(() => {
       btn.disabled = false;
-      btn.textContent = "Submit Request";
+      btn.textContent = "Submit Entry";
       saveLocallyOffline(record);
-      showPopup("Saved Offline", "Connection interrupted. Queued locally and will sync when online.", "warning");
+      showPopup("Saved Offline", "Connection timeout. Queued locally for background sync.", "warning");
       resetForm();
     });
   }
@@ -678,7 +740,7 @@
 
   async function syncOfflineQueue() {
     let queue = JSON.parse(localStorage.getItem('offline_attendance_queue') || '[]');
-    if (queue.length === 0) return;
+    if (queue.length === 0 || GAS_API_URL === "YOUR_DEPLOYED_WEB_APP_URL_HERE") return;
 
     let remainingQueue = [];
     let syncedCount = 0;
@@ -699,81 +761,51 @@
 
     localStorage.setItem('offline_attendance_queue', JSON.stringify(remainingQueue));
     updateQueueBadge();
-    if (syncedCount > 0) showPopup("Auto Sync Complete", `${syncedCount} offline record(s) synced to Google Sheets.`, "success");
+    if (syncedCount > 0) showPopup("Sync Complete", `${syncedCount} queued record(s) synced to Google Sheets.`, "success");
   }
 
-  function onFullNameChange() {
-    const proj = document.getElementById('project').value;
-    const org = document.getElementById('organization').value;
-    const dist = document.getElementById('district').value;
-    const uc = document.getElementById('unionCouncil').value;
-    const name = document.getElementById('fullName').value;
+  function fetchServerMonthSummary(fullName) {
+    if (!navigator.onLine || GAS_API_URL === "YOUR_DEPLOYED_WEB_APP_URL_HERE") return;
 
-    const filtered = masterRoster.filter(e => e.project === proj && e.organization === org && e.district === dist && e.unionCouncil === uc && e.fullName === name);
-    const desigs = [...new Set(filtered.map(e => e.designation))].filter(Boolean);
-    
-    populateSelect('designation', desigs, '-- Select Designation --');
-    document.getElementById('designation').disabled = false;
-    if (desigs.length === 1) document.getElementById('designation').value = desigs[0];
+    const todayStr = getTodayStr();
+    const currentMY = getCurrentMonthYearStr();
 
-    // Fetch user records from server and filter locally according to retention rules
-    fetchServerMonthSummary(name);
+    fetch(GAS_API_URL, {
+      method: 'POST',
+      body: JSON.stringify({
+        action: 'getUserMonthSummary',
+        fullName: fullName,
+        monthYear: currentMY
+      })
+    })
+    .then(res => res.json())
+    .then(res => {
+      if (res.status === 'SUCCESS' && Array.isArray(res.records)) {
+        let localLogs = getLocalLogs();
+
+        const validServerRecords = res.records.filter(r => {
+          const isLeave = r.type && r.type.startsWith('Leave');
+          if (isLeave) return true;
+          return r.time.startsWith(todayStr);
+        });
+
+        validServerRecords.forEach(serverRec => {
+          const exists = localLogs.some(l => 
+            l.fullName.toLowerCase() === serverRec.fullName.toLowerCase() && 
+            l.time === serverRec.time && 
+            l.type === serverRec.type
+          );
+          if (!exists) localLogs.push(serverRec);
+        });
+
+        localStorage.setItem('user_attendance_logs', JSON.stringify(localLogs));
+        pruneLocalCache();
+      }
+    })
+    .catch(() => {});
   }
 
-  /* UTILITY & UI FUNCTIONS */
-  function initDatePicker() {
-    datePickerInstance = flatpickr("#leaveDatesPicker", {
-      mode: "multiple", dateFormat: "d/m/Y", conjunction: ", ", minDate: "today"
-    });
-  }
-
-  function toggleAttendanceType() {
-    const isLeave = document.getElementById('typeLeave').checked;
-    document.getElementById('leavePanel').style.display = isLeave ? 'block' : 'none';
-    document.getElementById('timeFieldContainer').style.display = isLeave ? 'none' : 'block';
-  }
-
-  function initClock() {
-    setInterval(() => {
-      const d = new Date();
-      const pad = n => String(n).padStart(2, '0');
-      document.getElementById('timeDisplay').value = `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
-    }, 1000);
-  }
-
-  function initLeafletMap() {
-    map = L.map('mapContainer').setView([20.0, 0.0], 2);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
-  }
-
-  function fetchGPSLocation() {
-    const locInput = document.getElementById('locationDisplay');
-    locInput.value = "Acquiring GPS coordinates...";
-    if (!("geolocation" in navigator)) { locInput.value = "GPS Not Supported"; return; }
-
-    navigator.geolocation.getCurrentPosition((pos) => {
-      const lat = pos.coords.latitude.toFixed(6), lng = pos.coords.longitude.toFixed(6);
-      locInput.value = `${lat}, ${lng}`;
-      map.setView([lat, lng], 16);
-      if (mapMarker) mapMarker.setLatLng([lat, lng]);
-      else mapMarker = L.marker([lat, lng]).addTo(map);
-    }, () => { locInput.value = "GPS Access Denied"; }, { enableHighAccuracy: true });
-  }
-
-  function updateNetworkStatus() {
-    const statusEl = document.getElementById('networkStatus');
-    statusEl.className = navigator.onLine ? "chip-badge chip-online" : "chip-badge chip-offline";
-    statusEl.textContent = navigator.onLine ? "● Online" : "● Offline";
-    updateQueueBadge();
-  }
-
-  function updateQueueBadge() {
-    const queue = JSON.parse(localStorage.getItem('offline_attendance_queue') || '[]');
-    const badge = document.getElementById('queueStatus');
-    badge.className = queue.length > 0 ? "chip-badge chip-sync has-pending" : "chip-badge chip-sync";
-    badge.textContent = `Sync Queue: ${queue.length}`;
-  }
-
+  /* DROPDOWN & ROSTER CASCADE LOGIC */
   function loadRosterData() {
     const cached = localStorage.getItem('employee_roster_cache');
     if (cached) { masterRoster = JSON.parse(cached); initProjectDropdown(); }
@@ -830,17 +862,70 @@
     document.getElementById('fullName').disabled = false;
   }
 
+  function onFullNameChange() {
+    const proj = document.getElementById('project').value;
+    const org = document.getElementById('organization').value;
+    const dist = document.getElementById('district').value;
+    const uc = document.getElementById('unionCouncil').value;
+    const name = document.getElementById('fullName').value;
+
+    const filtered = masterRoster.filter(e => e.project === proj && e.organization === org && e.district === dist && e.unionCouncil === uc && e.fullName === name);
+    const desigs = [...new Set(filtered.map(e => e.designation))].filter(Boolean);
+    
+    populateSelect('designation', desigs, '-- Select Designation --');
+    document.getElementById('designation').disabled = false;
+    if (desigs.length === 1) document.getElementById('designation').value = desigs[0];
+
+    // Background sync user logs for validation
+    fetchServerMonthSummary(name);
+  }
+
+  /* HELPERS & UI CONTROLS */
+  function initDatePicker() {
+    datePickerInstance = flatpickr("#leaveDatesPicker", {
+      mode: "multiple", dateFormat: "d/m/Y", conjunction: ", ", minDate: "today"
+    });
+  }
+
+  function toggleType() {
+    const isLeave = document.getElementById('typeLeave').checked;
+    document.getElementById('leaveContainer').style.display = isLeave ? 'block' : 'none';
+    document.getElementById('timeContainer').style.display = isLeave ? 'none' : 'block';
+  }
+
+  function initClock() {
+    setInterval(() => {
+      const d = new Date();
+      const pad = n => String(n).padStart(2, '0');
+      document.getElementById('timeDisplay').value = `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+    }, 1000);
+  }
+
+  function updateNetworkStatus() {
+    const statusEl = document.getElementById('networkBadge');
+    statusEl.className = navigator.onLine ? "badge-pill badge-online" : "badge-pill badge-offline";
+    statusEl.textContent = navigator.onLine ? "● Online" : "● Offline";
+    updateQueueBadge();
+  }
+
+  function updateQueueBadge() {
+    const queue = JSON.parse(localStorage.getItem('offline_attendance_queue') || '[]');
+    const badge = document.getElementById('queueBadge');
+    badge.className = queue.length > 0 ? "badge-pill badge-queue active" : "badge-pill badge-queue";
+    badge.textContent = `Sync Queue: ${queue.length}`;
+  }
+
   function populateSelect(id, items, placeholder) {
     const el = document.getElementById(id);
     el.innerHTML = `<option value="">${placeholder}</option>` + items.map(i => `<option value="${i}">${i}</option>`).join('');
   }
 
   function resetForm() {
-    const savedEmail = document.getElementById('userEmail').value;
+    const currentEmail = document.getElementById('userEmail').value;
     document.getElementById('attendanceForm').reset();
-    document.getElementById('userEmail').value = savedEmail;
+    document.getElementById('userEmail').value = currentEmail;
     document.getElementById('typeIn').checked = true;
-    toggleAttendanceType();
+    toggleType();
     if (datePickerInstance) datePickerInstance.clear();
     initProjectDropdown();
     fetchGPSLocation();
@@ -850,7 +935,7 @@
     const modal = document.getElementById('popupModal');
     document.getElementById('popupTitle').textContent = title;
     document.getElementById('popupMessage').textContent = message;
-    modal.className = `popup-backdrop popup-${type} active`;
+    modal.className = `popup-overlay popup-${type} active`;
     document.getElementById('popupIcon').textContent = type === "success" ? "✓" : (type === "warning" ? "!" : "✕");
   }
 

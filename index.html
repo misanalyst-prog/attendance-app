@@ -393,7 +393,7 @@
 
 <script>
   // INSERT YOUR GOOGLE APPS SCRIPT WEB APP URL HERE
-  const GAS_API_URL = "https://script.google.com/macros/s/AKfycbyLEMc5wnhuEbJXp7hP5Pmxhs4kKRU5LZABFqyd4ZnqJaWjJaVqUJhnqMFZPhXGUhFO-g/exec";
+  const GAS_API_URL = "YOUR_DEPLOYED_WEB_APP_URL_HERE";
 
   let masterRoster = [];
   let map = null;
@@ -437,7 +437,8 @@
     datePickerInstance = flatpickr("#leaveDatesPicker", {
       mode: "multiple",
       dateFormat: "d/m/Y",
-      conjunction: ", "
+      conjunction: ", ",
+      minDate: "today" // Restricts users from picking past dates
     });
   }
 

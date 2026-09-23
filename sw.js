@@ -1,4 +1,4 @@
-const CACHE_NAME = 'attendance-v8';
+const CACHE_NAME = 'attendance-v9';
 
 const ASSETS_TO_CACHE = [
   './',
@@ -12,6 +12,7 @@ const ASSETS_TO_CACHE = [
   'https://cdn.jsdelivr.net/npm/flatpickr'
 ];
 
+// Install Event - Pre-cache core shell assets
 self.addEventListener('install', (event) => {
   self.skipWaiting();
   event.waitUntil(
@@ -19,32 +20,48 @@ self.addEventListener('install', (event) => {
   );
 });
 
+// Activate Event - Clean up stale caches and claim clients
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((cacheNames) => {
       return Promise.all(
         cacheNames.map((cache) => {
-          if (cache !== CACHE_NAME) return caches.delete(cache);
+          if (cache !== CACHE_NAME) {
+            return caches.delete(cache);
+          }
         })
       );
     }).then(() => self.clients.claim())
   );
 });
 
+// Fetch Event - Intercept network requests
 self.addEventListener('fetch', (event) => {
+  // Bypass non-GET requests and direct Google Apps Script calls
   if (event.request.method !== 'GET' || event.request.url.includes('script.google.com')) {
     return;
   }
 
+  // Cache-First with Network Fallback Strategy
   event.respondWith(
-    fetch(event.request)
-      .then((networkResponse) => {
-        if (networkResponse && networkResponse.status === 200) {
+    caches.match(event.request).then((cachedResponse) => {
+      if (cachedResponse) {
+        // Return cached asset immediately
+        return cachedResponse;
+      }
+
+      // If not in cache, fetch from network and cache for future offline access
+      return fetch(event.request).then((networkResponse) => {
+        // Accept valid responses (200) and opaque CDN responses (type === 'opaque' / status 0)
+        if (
+          networkResponse &&
+          (networkResponse.status === 200 || networkResponse.type === 'opaque')
+        ) {
           const responseToCache = networkResponse.clone();
           caches.open(CACHE_NAME).then((cache) => cache.put(event.request, responseToCache));
         }
         return networkResponse;
-      })
-      .catch(() => caches.match(event.request))
+      });
+    })
   );
 });

@@ -117,22 +117,10 @@
       border-color: var(--accent);
       box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
     }
-    .form-control[readonly], .form-control:disabled, .form-select:disabled {
+    .form-control:disabled, .form-select:disabled {
       background-color: #f8fafc;
       color: #64748b;
       cursor: not-allowed;
-    }
-
-    .email-locked-wrapper {
-      position: relative;
-    }
-    .email-lock-icon {
-      position: absolute;
-      right: 12px;
-      top: 50%;
-      transform: translateY(-50%);
-      font-size: 0.85rem;
-      color: var(--text-secondary);
     }
 
     .segmented-picker {
@@ -273,13 +261,10 @@
 
     <form id="attendanceForm">
       
-      <!-- EMAIL (AUTOMATICALLY FETCHED & READONLY) -->
+      <!-- EMAIL (EDITABLE FIELD) -->
       <div class="form-group">
-        <label class="form-label">Official Email Address</label>
-        <div class="email-locked-wrapper">
-          <input type="email" id="userEmail" class="form-control" placeholder="Detecting email address..." readonly required>
-          <span class="email-lock-icon">🔒</span>
-        </div>
+        <label class="form-label">Email <span class="text-danger">*</span></label>
+        <input type="email" id="userEmail" class="form-control" placeholder="name@organization.com" required onchange="localStorage.setItem('saved_user_email', this.value)">
       </div>
 
       <!-- ROSTER DROPDOWNS -->
@@ -368,13 +353,13 @@
         <input type="text" id="timeDisplay" class="form-control" readonly placeholder="Capturing time...">
       </div>
 
-      <!-- HIGH PRECISION GPS LOCATION -->
+      <!-- GPS LOCATION (NUMERIC DIGITS ONLY) -->
       <div class="form-group">
         <div class="d-flex justify-content-between align-items-center mb-1">
           <label class="form-label mb-0">GPS Location</label>
-          <button type="button" class="gps-btn" onclick="fetchGPSLocation(true)">🔄 High-Accuracy GPS</button>
+          <button type="button" class="gps-btn" onclick="fetchGPSLocation(true)">🔄 GPS</button>
         </div>
-        <input type="text" id="locationDisplay" class="form-control" readonly placeholder="Acquiring precision GPS location...">
+        <input type="text" id="locationDisplay" class="form-control" readonly placeholder="Acquiring GPS coordinates...">
         <div id="mapContainer" class="map-box"></div>
       </div>
 
@@ -404,7 +389,6 @@
 <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
 
 <script>
-  // Paste your deployed Google Apps Script Web App URL here if hosting standalone:
   const GAS_API_URL = "https://script.google.com/macros/s/AKfycbyLEMc5wnhuEbJXp7hP5Pmxhs4kKRU5LZABFqyd4ZnqJaWjJaVqUJhnqMFZPhXGUhFO-g/exec";
 
   let masterRoster = [];
@@ -412,8 +396,10 @@
   let datePickerInstance = null;
 
   window.addEventListener('load', () => {
+    const savedEmail = localStorage.getItem('saved_user_email');
+    if (savedEmail) document.getElementById('userEmail').value = savedEmail;
+
     pruneLocalCache();
-    initUserEmail();
     updateNetworkStatus();
     initClock();
     initLeafletMap();
@@ -427,53 +413,16 @@
   window.addEventListener('online', () => { updateNetworkStatus(); syncOfflineQueue(); });
   window.addEventListener('offline', updateNetworkStatus);
 
-  /* AUTOMATIC USER EMAIL DETECTOR */
-  function initUserEmail() {
-    // If rendered directly by Google Apps Script HtmlService template:
-    const injectedEmail = "<?= userEmail ?>"; 
-    
-    if (injectedEmail && !injectedEmail.includes("<?= ")) {
-      setEmailField(injectedEmail);
-      return;
-    }
-
-    // Try localStorage fallback
-    const cachedEmail = localStorage.getItem('cached_user_email');
-    if (cachedEmail) setEmailField(cachedEmail);
-
-    // Fetch from backend API session if connected
-    if (navigator.onLine && GAS_API_URL !== "YOUR_DEPLOYED_WEB_APP_URL_HERE") {
-      fetch(GAS_API_URL, {
-        method: 'POST',
-        body: JSON.stringify({ action: 'getUserContext' })
-      })
-      .then(r => r.json())
-      .then(res => {
-        if (res.status === 'SUCCESS' && res.email) {
-          setEmailField(res.email);
-        }
-      })
-      .catch(() => {});
-    }
-  }
-
-  function setEmailField(email) {
-    const emailInput = document.getElementById('userEmail');
-    emailInput.value = email;
-    localStorage.setItem('cached_user_email', email);
-  }
-
-  /* HIGH-PRECISION GPS LOCATION WITH OFFLINE CACHING & ACCURACY DISPLAY */
+  /* GPS LOCATION (RETURNS STRICTLY ##.######, ##.######) */
   function fetchGPSLocation(forceRefresh = false) {
     const locInput = document.getElementById('locationDisplay');
-    locInput.value = "Acquiring precision GPS location...";
+    locInput.value = "Acquiring GPS coordinates...";
 
-    // Use offline cached GPS position if available and network is offline
     if (!navigator.onLine && !forceRefresh) {
       const cachedLoc = localStorage.getItem('cached_last_gps');
       if (cachedLoc) {
-        locInput.value = cachedLoc + " (Offline Cache)";
-        const parts = cachedLoc.split('(')[0].split(',');
+        locInput.value = cachedLoc;
+        const parts = cachedLoc.split(',');
         if (parts.length === 2) updateMapMarker(parseFloat(parts[0]), parseFloat(parts[1]));
         return;
       }
@@ -485,8 +434,8 @@
     }
 
     const geoOptions = {
-      enableHighAccuracy: true, // Force hardware GPS sensor
-      timeout: 15000,           // Allow up to 15s for satellites lock
+      enableHighAccuracy: true,
+      timeout: 15000,
       maximumAge: forceRefresh ? 0 : 5000
     };
 
@@ -494,21 +443,19 @@
       (pos) => {
         const lat = pos.coords.latitude.toFixed(6);
         const lng = pos.coords.longitude.toFixed(6);
-        const accuracy = Math.round(pos.coords.accuracy);
+        const formattedLoc = `${lat}, ${lng}`;
         
-        const formattedLoc = `${lat}, ${lng} (±${accuracy}m accuracy)`;
         locInput.value = formattedLoc;
 
-        // Cache precision coordinates for offline fallback
         localStorage.setItem('cached_last_gps', formattedLoc);
         updateMapMarker(parseFloat(lat), parseFloat(lng));
       },
       (err) => {
         const cachedLoc = localStorage.getItem('cached_last_gps');
         if (cachedLoc) {
-          locInput.value = cachedLoc + " (Cached - GPS Timeout)";
+          locInput.value = cachedLoc;
         } else {
-          locInput.value = `GPS Error: ${err.message || 'Position Unavailable'}`;
+          locInput.value = "GPS Access Denied";
         }
       },
       geoOptions
@@ -527,7 +474,7 @@
     else mapMarker = L.marker([lat, lng]).addTo(map);
   }
 
-  /* LOCAL CACHE & VALIDATION RULES (INTERNAL ONLY) */
+  /* LOCAL CACHE & VALIDATION RULES (INTERNAL) */
   function getTodayStr() {
     const d = new Date();
     const pad = n => String(n).padStart(2, '0');
@@ -544,7 +491,6 @@
     return JSON.parse(localStorage.getItem('user_attendance_logs') || '[]');
   }
 
-  // Retention Enforcement: Check-In/Out kept for CURRENT DAY; Leaves for CURRENT MONTH
   function pruneLocalCache() {
     let logs = getLocalLogs();
     const todayStr = getTodayStr();
@@ -575,7 +521,6 @@
     const todayStr = getTodayStr();
     const logs = pruneLocalCache().filter(r => r.fullName.toLowerCase() === record.fullName.toLowerCase());
 
-    // Rule 1: Leave Check (Full Month Scope)
     if (record.type === 'Leave') {
       const leaveDates = record.leaveDates || [];
       for (let targetDate of leaveDates) {
@@ -587,7 +532,6 @@
       return { valid: true };
     }
 
-    // Rule 2: Attendance Check (Current Date Scope)
     const todayLogs = logs.filter(r => r.time.startsWith(todayStr));
     const hasLeaveToday = todayLogs.some(r => r.type.startsWith('Leave'));
     const hasCheckInToday = todayLogs.some(r => r.type === 'Check-In');
@@ -619,7 +563,7 @@
     return { valid: true };
   }
 
-  /* FORM SUBMISSION HANDLING */
+  /* FORM SUBMISSION */
   document.getElementById('attendanceForm').addEventListener('submit', function(e) {
     e.preventDefault();
 
@@ -627,12 +571,12 @@
     const locVal = document.getElementById('locationDisplay').value;
 
     if (!email) {
-      showPopup("Email Missing", "Could not detect active user email.", "error");
+      showPopup("Email Missing", "Please enter a valid email address.", "error");
       return;
     }
 
-    if (!locVal || locVal.includes("Acquiring") || locVal.includes("Error")) {
-      showPopup("Location Error", "Please refresh high-accuracy GPS position before submitting.", "error");
+    if (!locVal || locVal.includes("Acquiring") || locVal.includes("Denied") || locVal.includes("Supported")) {
+      showPopup("Location Error", "Please capture GPS coordinates before submitting.", "error");
       return;
     }
 
@@ -674,14 +618,12 @@
       record.time = `${leaveDates[0]} 09:00:00`;
     }
 
-    // Validation Check against local cache
     const localCheck = validateLocally(record);
     if (!localCheck.valid) {
       showPopup(localCheck.title, localCheck.message, "error");
       return;
     }
 
-    // Commit to internal validation cache
     if (type === 'Leave') {
       record.leaveDates.forEach(d => {
         saveLocalLog({ ...record, type: `Leave (${record.leaveCategory})`, time: `${d} 09:00:00` });
@@ -876,7 +818,6 @@
     document.getElementById('designation').disabled = false;
     if (desigs.length === 1) document.getElementById('designation').value = desigs[0];
 
-    // Background sync user logs for validation
     fetchServerMonthSummary(name);
   }
 

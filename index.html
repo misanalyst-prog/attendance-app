@@ -80,6 +80,7 @@
     .pill-offline { background: #fef3c7; color: #b45309; }
     .pill-queue { background: #f1f5f9; color: #475569; }
     .pill-queue.active { background: #e0e7ff; color: #3730a3; font-weight: 800; }
+    .pill-tamper { background: #fee2e2; color: #b91c1c; font-weight: 800; }
 
     .pulse-dot {
       width: 8px;
@@ -172,6 +173,12 @@
       cursor: not-allowed;
       border-color: #f1f5f9;
     }
+    .form-control.tampered-field {
+      border-color: #ef4444;
+      background-color: #fef2f2;
+      color: #991b1b;
+      font-weight: 700;
+    }
 
     /* SEGMENTED TOGGLE SWITCH */
     .segmented-picker {
@@ -262,7 +269,12 @@
       background: var(--primary-hover);
       transform: translateY(-1px);
     }
-    .btn-submit:active { transform: translateY(0); }
+    .btn-submit:disabled {
+      background: #94a3b8;
+      box-shadow: none;
+      cursor: not-allowed;
+      transform: none;
+    }
 
     /* POPUP MODAL */
     .popup-overlay {
@@ -482,6 +494,13 @@
   let map = null, mapMarker = null;
   let datePickerInstance = null;
 
+  /* TIME TAMPERING DETECTION VARIABLES */
+  let sessionBaseWallTime = Date.now();
+  let sessionBasePerfTime = performance.now();
+  let isTimeTampered = false;
+  let timeTamperReason = "";
+  let popupTamperAlertShown = false;
+
   window.addEventListener('load', () => {
     lucide.createIcons();
 
@@ -501,15 +520,15 @@
     initDatePicker();
     fetchGPSLocation();
     
-    // Load cached roster dataset and restore saved selections
+    // Load cached roster dataset
     loadRosterData();
 
     if (navigator.onLine) syncOfflineQueue();
   });
 
-  // PREVENT NEW TAB CREATION ON LOCK SCREEN UNLOCK
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible') {
+      verifyTimeIntegrity();
       fetchGPSLocation(true);
       if (navigator.onLine) syncOfflineQueue();
     }
@@ -517,6 +536,71 @@
 
   window.addEventListener('online', () => { updateNetworkStatus(); syncOfflineQueue(); });
   window.addEventListener('offline', updateNetworkStatus);
+
+  /* TIME TAMPERING ENGINE (OFFLINE & ONLINE) */
+  function verifyTimeIntegrity() {
+    const currentWallTime = Date.now();
+    const lastKnownTime = parseInt(localStorage.getItem('max_observed_timestamp') || '0', 10);
+
+    // 1. Rollback Detection: Has the device clock been turned back in time?
+    if (currentWallTime < lastKnownTime - 5000) { // 5 second allowance
+      isTimeTampered = true;
+      timeTamperReason = "System clock rollback detected! Your device time was set backwards.";
+      triggerTamperState();
+      return false;
+    }
+
+    // 2. Session Jump Detection: Has clock been manually changed while app is open?
+    const elapsedPerfMs = performance.now() - sessionBasePerfTime;
+    const expectedWallTime = sessionBaseWallTime + elapsedPerfMs;
+    if (Math.abs(currentWallTime - expectedWallTime) > 60000) { // 1 minute allowance
+      isTimeTampered = true;
+      timeTamperReason = "Manual time manipulation detected during active session.";
+      triggerTamperState();
+      return false;
+    }
+
+    // Clock is valid: Update max observed timestamp
+    if (currentWallTime > lastKnownTime) {
+      localStorage.setItem('max_observed_timestamp', currentWallTime.toString());
+    }
+
+    // Reset tamper state if clock is restored
+    if (isTimeTampered) {
+      isTimeTampered = false;
+      timeTamperReason = "";
+      popupTamperAlertShown = false;
+      document.getElementById('timeDisplay').classList.remove('tampered-field');
+      document.getElementById('submitBtn').disabled = false;
+    }
+
+    return true;
+  }
+
+  function triggerTamperState() {
+    const timeInput = document.getElementById('timeDisplay');
+    timeInput.value = "⚠️ TIME TAMPERED - BLOCKED";
+    timeInput.classList.add('tampered-field');
+
+    document.getElementById('submitBtn').disabled = true;
+
+    if (!popupTamperAlertShown) {
+      popupTamperAlertShown = true;
+      showPopup("Time Tampering Detected", `${timeTamperReason} Submissions are locked. Please set your device clock to 'Automatic Network Time'.`, "error");
+    }
+  }
+
+  function syncServerTimeOffset(serverMs) {
+    if (!serverMs) return;
+    const clientMs = Date.now();
+    const diff = Math.abs(clientMs - serverMs);
+    // If client clock deviates by more than 3 minutes (180,000ms) from Google Server
+    if (diff > 180000) {
+      isTimeTampered = true;
+      timeTamperReason = "Device clock differs significantly from Network Server time.";
+      triggerTamperState();
+    }
+  }
 
   /* ROSTER CACHING & DROPDOWN PERSISTENCE */
   function loadRosterData() {
@@ -532,6 +616,7 @@
       fetch(GAS_API_URL, { method: 'POST', body: JSON.stringify({ action: 'getEmployees' }) })
       .then(res => res.json())
       .then(res => {
+        if (res.serverTimeMs) syncServerTimeOffset(res.serverTimeMs);
         if (res.status === 'SUCCESS' && res.employees && res.employees.length > 0) {
           masterRoster = res.employees;
           localStorage.setItem('employee_roster_cache', JSON.stringify(masterRoster));
@@ -753,6 +838,11 @@
   }
 
   function validateLocally(record) {
+    // Check time tampering first
+    if (!verifyTimeIntegrity()) {
+      return { valid: false, title: "Time Tampering Detected", message: `${timeTamperReason} Submissions are locked.` };
+    }
+
     const todayStr = getTodayStr();
     const logs = pruneLocalCache().filter(r => r.fullName.toLowerCase() === record.fullName.toLowerCase());
 
@@ -802,6 +892,11 @@
   document.getElementById('attendanceForm').addEventListener('submit', function(e) {
     e.preventDefault();
 
+    if (!verifyTimeIntegrity()) {
+      showPopup("Time Tampering Detected", `${timeTamperReason} Set clock to automatic time.`, "error");
+      return;
+    }
+
     const email = document.getElementById('userEmail').value.trim();
     const locVal = document.getElementById('locationDisplay').value;
 
@@ -836,6 +931,7 @@
       designation: desig,
       type: type,
       time: currentTimeFormatted,
+      clientTimestampMs: Date.now(),
       submissionTime: currentTimeFormatted,
       location: locVal,
       remarks: remarks
@@ -887,6 +983,8 @@
     })
     .then(res => res.json())
     .then(res => {
+      if (res.serverTimeMs) syncServerTimeOffset(res.serverTimeMs);
+
       btn.disabled = false;
       btn.innerHTML = `<i data-lucide="send" style="width: 18px;"></i> Submit Attendance`;
       lucide.createIcons();
@@ -895,9 +993,7 @@
         showPopup("Submitted Successfully", `Entry recorded for ${record.fullName}.`, "success");
         resetForm();
       } else {
-        saveLocallyOffline(record);
-        showPopup("Queued Offline", res.message || "Server issue encountered. Saved locally.", "warning");
-        resetForm();
+        showPopup("Submission Failed", res.message || "Server issue encountered.", "error");
       }
     })
     .catch(() => {
@@ -921,6 +1017,11 @@
     let queue = JSON.parse(localStorage.getItem('offline_attendance_queue') || '[]');
     if (queue.length === 0 || GAS_API_URL === "YOUR_DEPLOYED_WEB_APP_URL_HERE") return;
 
+    if (!verifyTimeIntegrity()) {
+      showPopup("Time Tampering Detected", "Offline sync paused because device clock is tampered.", "error");
+      return;
+    }
+
     let remainingQueue = [];
     let syncedCount = 0;
 
@@ -931,6 +1032,8 @@
           body: JSON.stringify({ action: 'submitAttendance', record: record })
         });
         const res = await response.json();
+        if (res.serverTimeMs) syncServerTimeOffset(res.serverTimeMs);
+
         if (res.status === 'SUCCESS' || res.status === 'SUCCESS_LEAVE') syncedCount++;
         else remainingQueue.push(record);
       } catch (err) {
@@ -959,6 +1062,8 @@
     })
     .then(res => res.json())
     .then(res => {
+      if (res.serverTimeMs) syncServerTimeOffset(res.serverTimeMs);
+
       if (res.status === 'SUCCESS' && Array.isArray(res.records)) {
         let localLogs = getLocalLogs();
 
@@ -999,6 +1104,8 @@
 
   function initClock() {
     setInterval(() => {
+      if (!verifyTimeIntegrity()) return;
+
       const d = new Date();
       const pad = n => String(n).padStart(2, '0');
       document.getElementById('timeDisplay').value = `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
@@ -1053,4 +1160,4 @@
   function closePopup() { document.getElementById('popupModal').classList.remove('active'); }
 </script>
 </body>
-</html>
+</html>  

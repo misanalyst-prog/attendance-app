@@ -24,7 +24,6 @@
       --text-main: #0f172a;
       --text-muted: #64748b;
       --primary: #2563eb;
-      --primary-hover: #1d4ed8;
       --border-color: #e2e8f0;
       --readonly-bg: #f8fafc;
     }
@@ -90,7 +89,6 @@
       font-size: 0.8rem;
       color: #334155;
       margin-bottom: 6px;
-      letter-spacing: 0.01em;
     }
 
     .form-select, .form-control {
@@ -144,7 +142,6 @@
       box-shadow: 0 2px 8px rgba(37, 99, 235, 0.25);
     }
 
-    /* YELLOW LEAVE BUTTON STYLING */
     .segmented-control input[id="typeLeave"]:checked + label {
       background-color: #eab308 !important;
       color: #0f172a !important;
@@ -177,7 +174,7 @@
     }
 
     #mapContainer {
-      height: 160px;
+      height: 150px;
       border-radius: 14px;
       border: 1.5px solid var(--border-color);
       margin-bottom: 1rem;
@@ -192,7 +189,6 @@
       font-weight: 600;
       font-size: 0.98rem;
       color: #ffffff;
-      transition: background-color 0.2s ease;
     }
 
     .popup-backdrop {
@@ -228,6 +224,7 @@
     }
 
     .popup-error .popup-icon { background: #fee2e2; color: #dc2626; }
+    .popup-warning .popup-icon { background: #fef3c7; color: #b45309; }
     .popup-success .popup-icon { background: #dcfce7; color: #166534; }
 
     .popup-btn {
@@ -237,6 +234,7 @@
     }
 
     .popup-error .popup-btn { background: #dc2626; color: white; }
+    .popup-warning .popup-btn { background: #b45309; color: white; }
     .popup-success .popup-btn { background: #166534; color: white; }
   </style>
 </head>
@@ -251,13 +249,13 @@
 
   <div class="card-custom">
     <div class="text-center mb-4">
-      <h5 class="fw-bold m-0" style="color: var(--text-main);">Attendance & Leave Portal</h5>
-      <p class="text-muted small m-0 mt-1">Multi-Date Leave & Location Sync</p>
+      <h5 class="fw-bold m-0">Attendance & Leave Portal</h5>
+      <p class="text-muted small m-0 mt-1">Multi-Date Leave & Fast Sync</p>
     </div>
 
     <form id="attendanceForm">
       
-      <!-- User Email Input -->
+      <!-- User Email -->
       <div class="mb-3">
         <label class="form-label">Official Email Address <span class="text-danger">*</span></label>
         <input type="email" id="userEmail" class="form-control" placeholder="name@organization.com" required onchange="localStorage.setItem('saved_user_email', this.value)">
@@ -326,7 +324,7 @@
         </div>
       </div>
 
-      <!-- LEAVE OPTIONS PANEL (DYNAMICALLY SHOWN ON LEAVE SELECTION) -->
+      <!-- LEAVE PANEL -->
       <div id="leavePanel" class="leave-panel">
         <div class="mb-3">
           <label class="form-label">Leave Category <span class="text-danger">*</span></label>
@@ -348,7 +346,7 @@
         </div>
       </div>
 
-      <!-- Current Time Display (For Check-In / Check-Out) -->
+      <!-- Time Display -->
       <div class="mb-3" id="timeFieldContainer">
         <label class="form-label">Current Date & Time</label>
         <input type="text" id="timeDisplay" class="form-control" readonly placeholder="Capturing time...">
@@ -372,7 +370,7 @@
 
       <!-- Remarks -->
       <div class="mb-4">
-        <label class="form-label">Remarks <span class="text-muted fw-normal">(Optional / Reason for Leave)</span></label>
+        <label class="form-label">Remarks <span class="text-muted fw-normal">(Optional)</span></label>
         <textarea id="remarks" class="form-control" rows="2" placeholder="Write any optional notes..."></textarea>
       </div>
 
@@ -382,7 +380,7 @@
 </div>
 
 <div id="popupModal" class="popup-backdrop popup-error">
-  <div class="popup-card" tabindex="-1" id="popupCard">
+  <div class="popup-card" tabindex="-1">
     <div id="popupIcon" class="popup-icon">!</div>
     <h6 id="popupTitle" class="fw-bold mb-2">Notice</h6>
     <p id="popupMessage" class="text-muted small mb-0"></p>
@@ -394,7 +392,7 @@
 <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
 
 <script>
-  // INSERT YOUR DEPLOYED GOOGLE APPS SCRIPT URL HERE
+  // INSERT YOUR GOOGLE APPS SCRIPT WEB APP URL HERE
   const GAS_API_URL = "https://script.google.com/macros/s/AKfycbyLEMc5wnhuEbJXp7hP5Pmxhs4kKRU5LZABFqyd4ZnqJaWjJaVqUJhnqMFZPhXGUhFO-g/exec";
 
   let masterRoster = [];
@@ -403,11 +401,6 @@
   let capturedLat = null;
   let capturedLng = null;
   let datePickerInstance = null;
-
-  // Time tampering trackers
-  let basePerfTime = performance.now();
-  let baseRealTime = Date.now();
-  let maxObservedTime = Number(localStorage.getItem('max_observed_timestamp') || Date.now());
 
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('./sw.js').then(reg => reg.update());
@@ -427,7 +420,7 @@
 
   window.addEventListener('online', () => {
     updateNetworkStatus();
-    syncOfflineQueue(); // Automatic sync on reconnect
+    syncOfflineQueue();
   });
 
   window.addEventListener('offline', updateNetworkStatus);
@@ -436,7 +429,6 @@
     datePickerInstance = flatpickr("#leaveDatesPicker", {
       mode: "multiple",
       dateFormat: "d/m/Y",
-      minDate: "today",
       conjunction: ", "
     });
   }
@@ -467,56 +459,35 @@
     document.getElementById('timeDisplay').value = formatted;
   }
 
-  function isTimeTamperedOffline() {
-    const now = Date.now();
-    if (now < maxObservedTime - 60000) return true;
-    if (now > maxObservedTime) {
-      localStorage.setItem('max_observed_timestamp', String(now));
-      maxObservedTime = now;
-    }
-    const perfElapsed = (performance.now() - basePerfTime) / 1000;
-    const realElapsed = (now - baseRealTime) / 1000;
-    return Math.abs(realElapsed - perfElapsed) > 120;
-  }
-
-  function checkOfflineValidation(record) {
-    const localLogs = JSON.parse(localStorage.getItem('local_today_logs') || '[]');
+  function checkLocalDuplicates(record) {
+    const localLogs = JSON.parse(localStorage.getItem('submitted_logs_history') || '[]');
     
     if (record.type === 'Leave') {
       const leaveDates = record.leaveDates || [];
-      const duplicateFound = leaveDates.some(dateStr => {
+      const duplicateDate = leaveDates.find(dateStr => {
         return localLogs.some(item => 
           item.fullName.trim().toLowerCase() === record.fullName.trim().toLowerCase() && 
-          item.time.includes(dateStr)
+          item.date === dateStr
         );
       });
 
-      if (duplicateFound) {
-        return { valid: false, message: "Leave Denied: You have already recorded leave for one or more of the selected dates locally." };
+      if (duplicateDate) {
+        return { valid: false, message: `Leave is already submitted for the selected date (${duplicateDate}).` };
       }
-    } else {
-      const recordDate = record.time.split(' ')[0];
-      const todayLogs = localLogs.filter(item => 
-        item.fullName.trim().toLowerCase() === record.fullName.trim().toLowerCase() && 
-        item.time.split(' ')[0] === recordDate
-      );
-
-      const hasCheckIn = todayLogs.some(i => i.type === 'Check-In');
-      const hasCheckOut = todayLogs.some(i => i.type === 'Check-Out');
-      const hasLeave = todayLogs.some(i => i.type.startsWith('Leave'));
-
-      if (hasLeave) return { valid: false, message: `Submission Blocked: Leave already logged for ${recordDate}.` };
-      if (record.type === 'Check-In' && hasCheckIn) return { valid: false, message: `Check-In Denied: Already checked in for ${recordDate}.` };
-      if (record.type === 'Check-Out' && (!hasCheckIn || hasCheckOut)) return { valid: false, message: `Check-Out Denied: Invalid check-out request.` };
     }
-
     return { valid: true };
   }
 
   function saveLocalLogHistory(record) {
-    let localLogs = JSON.parse(localStorage.getItem('local_today_logs') || '[]');
-    localLogs.push(record);
-    localStorage.setItem('local_today_logs', JSON.stringify(localLogs));
+    let localLogs = JSON.parse(localStorage.getItem('submitted_logs_history') || '[]');
+    if (record.type === 'Leave' && record.leaveDates) {
+      record.leaveDates.forEach(d => {
+        localLogs.push({ fullName: record.fullName, date: d, type: 'Leave' });
+      });
+    } else {
+      localLogs.push({ fullName: record.fullName, date: record.time.split(' ')[0], type: record.type });
+    }
+    localStorage.setItem('submitted_logs_history', JSON.stringify(localLogs));
   }
 
   function initLeafletMap() {
@@ -544,7 +515,7 @@
         else mapMarker = L.marker(latLng).addTo(map);
       },
       () => { locInput.value = "GPS Access Denied / Unavailable"; },
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+      { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }
     );
   }
 
@@ -564,7 +535,7 @@
 
   function loadRosterData() {
     if (navigator.onLine) {
-      fetch(GAS_API_URL, { method: 'POST', body: JSON.stringify({ action: 'getEmployees' }) })
+      fetchWithTimeout(GAS_API_URL, { method: 'POST', body: JSON.stringify({ action: 'getEmployees' }) }, 7000)
       .then(res => res.json())
       .then(res => {
         if (res.status === 'SUCCESS' && res.employees) {
@@ -642,14 +613,17 @@
     el.innerHTML = `<option value="">${placeholder}</option>` + items.map(i => `<option value="${i}">${i}</option>`).join('');
   }
 
-  // --- FORM SUBMISSION HANDLER ---
+  // --- FAST TIMEOUT FETCH WRAPPER FOR POOR CONNECTIONS ---
+  function fetchWithTimeout(url, options, timeoutMs = 7000) {
+    const controller = new AbortController();
+    const id = setTimeout(() => controller.abort(), timeoutMs);
+    return fetch(url, { ...options, signal: controller.signal })
+      .finally(() => clearTimeout(id));
+  }
+
+  // --- FORM SUBMISSION ---
   document.getElementById('attendanceForm').addEventListener('submit', function(e) {
     e.preventDefault();
-
-    if (isTimeTamperedOffline()) {
-      showPopup("Submission Blocked", "Time Tampering Detected! Please set your device clock to automatic time.", "error");
-      return;
-    }
 
     const email = document.getElementById('userEmail').value.trim();
     const locVal = document.getElementById('locationDisplay').value;
@@ -686,7 +660,7 @@
     if (type === 'Leave') {
       const selectedDatesStr = document.getElementById('leaveDatesPicker').value;
       if (!selectedDatesStr) {
-        showPopup("Missing Dates", "Please select at least one leave date on the calendar.", "error");
+        showPopup("Missing Dates", "Please select at least one leave date on the calendar.", "warning");
         return;
       }
       const leaveDates = selectedDatesStr.split(', ').map(d => d.trim());
@@ -695,9 +669,10 @@
       record.time = `${leaveDates[0]} 09:00:00`;
     }
 
-    const offlineCheck = checkOfflineValidation(record);
-    if (!offlineCheck.valid) {
-      showPopup("Submission Blocked", offlineCheck.message, "error");
+    // Check local duplicate cache first
+    const dupCheck = checkLocalDuplicates(record);
+    if (!dupCheck.valid) {
+      showPopup("Duplicate Leave", dupCheck.message, "warning");
       return;
     }
 
@@ -706,7 +681,7 @@
     } else {
       saveLocally(record);
       saveLocalLogHistory(record);
-      showPopup("Saved Offline", "Offline mode active. Record queued and will sync automatically when online.", "success");
+      showPopup("Saved Offline", "Offline mode active. Record queued for background sync.", "success");
       resetForm();
     }
   });
@@ -716,10 +691,10 @@
     btn.disabled = true;
     btn.textContent = "Submitting...";
 
-    fetch(GAS_API_URL, {
+    fetchWithTimeout(GAS_API_URL, {
       method: 'POST',
       body: JSON.stringify({ action: 'submitAttendance', record: record })
-    })
+    }, 8000)
     .then(res => res.json())
     .then(res => {
       btn.disabled = false;
@@ -727,7 +702,7 @@
 
       if (res.status === 'SUCCESS') {
         saveLocalLogHistory(record);
-        showPopup("Success", `${record.type} recorded for ${record.fullName}!`, "success");
+        showPopup("Success", `${record.type} recorded successfully for ${record.fullName}!`, "success");
         resetForm();
       } 
       else if (res.status === 'SUCCESS_LEAVE') {
@@ -735,19 +710,24 @@
         showPopup("Leave Submitted", res.message, "success");
         resetForm();
       }
+      else if (res.status === 'DUPLICATE_LEAVE') {
+        showPopup("Leave Already Submitted", res.message, "warning");
+      }
       else if (res.status === 'VALIDATION_FAILED') {
         showPopup("Notice", res.message, "error");
       } else {
         saveLocally(record);
-        showPopup("Saved Offline", "Server error. Queued for background sync.", "success");
+        showPopup("Saved Offline", "Server response delayed. Record queued locally.", "success");
         resetForm();
       }
     })
     .catch(() => {
+      // Timeout or poor connection fallback
       btn.disabled = false;
       btn.textContent = "Submit Request";
       saveLocally(record);
-      showPopup("Saved Offline", "Network drop. Saved to offline queue.", "success");
+      saveLocalLogHistory(record);
+      showPopup("Saved Offline", "Connection weak. Saved locally and queued for background sync.", "success");
       resetForm();
     });
   }
@@ -759,7 +739,6 @@
     updateQueueBadge();
   }
 
-  // FAST & SMOOTH ASYNC QUEUE SYNC (CONCURRENT SAFE)
   async function syncOfflineQueue() {
     let queue = JSON.parse(localStorage.getItem('offline_attendance_queue') || '[]');
     if (queue.length === 0) return;
@@ -769,13 +748,15 @@
 
     for (const record of queue) {
       try {
-        const response = await fetch(GAS_API_URL, {
+        const response = await fetchWithTimeout(GAS_API_URL, {
           method: 'POST',
           body: JSON.stringify({ action: 'submitAttendance', record: record })
-        });
+        }, 8000);
         const res = await response.json();
-        if (res.status === 'SUCCESS' || res.status === 'SUCCESS_LEAVE' || res.status === 'VALIDATION_FAILED') {
+        
+        if (res.status === 'SUCCESS' || res.status === 'SUCCESS_LEAVE' || res.status === 'DUPLICATE_LEAVE' || res.status === 'VALIDATION_FAILED') {
           syncedCount++;
+          saveLocalLogHistory(record);
         } else {
           remainingQueue.push(record);
         }
@@ -788,7 +769,7 @@
     updateQueueBadge();
 
     if (syncedCount > 0) {
-      showPopup("Sync Complete", `${syncedCount} offline record(s) processed. Any existing duplicate dates were automatically ignored.`, "success");
+      showPopup("Sync Complete", `${syncedCount} queued record(s) processed. Duplicate dates were ignored.`, "success");
     }
   }
 
@@ -808,8 +789,9 @@
     const icon = document.getElementById('popupIcon');
     document.getElementById('popupTitle').textContent = title;
     document.getElementById('popupMessage').textContent = message;
-    modal.className = type === "success" ? "popup-backdrop popup-success active" : "popup-backdrop popup-error active";
-    icon.textContent = type === "success" ? "✓" : "!";
+    
+    modal.className = `popup-backdrop popup-${type} active`;
+    icon.textContent = type === "success" ? "✓" : (type === "warning" ? "!" : "✕");
   }
 
   function closePopup() {

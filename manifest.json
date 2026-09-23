@@ -1,10 +1,10 @@
 {
-  "name": "Attendance Portal",
+  "name": "Attendance & Leave Portal",
   "short_name": "Attendance",
   "start_url": "./index.html",
   "display": "standalone",
-  "background_color": "#F8FAFC",
-  "theme_color": "#2563EB",
+  "background_color": "#f4f6f9",
+  "theme_color": "#2563eb",
   "icons": [
     {
       "src": "https://cdn-icons-png.flaticon.com/512/3652/3652191.png",

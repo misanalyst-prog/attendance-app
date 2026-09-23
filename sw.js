@@ -1,4 +1,4 @@
-const CACHE_NAME = 'attendance-v5';
+const CACHE_NAME = 'attendance-v6';
 
 const ASSETS_TO_CACHE = [
   './',
@@ -7,7 +7,9 @@ const ASSETS_TO_CACHE = [
   'https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap',
   'https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css',
   'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css',
-  'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js'
+  'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js',
+  'https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css',
+  'https://cdn.jsdelivr.net/npm/flatpickr'
 ];
 
 self.addEventListener('install', (event) => {

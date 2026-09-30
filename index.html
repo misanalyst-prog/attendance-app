@@ -37,10 +37,7 @@
       -webkit-font-smoothing: antialiased;
     }
 
-    .app-container {
-      max-width: 480px;
-      margin: 0 auto;
-    }
+    .app-container { max-width: 480px; margin: 0 auto; }
 
     .card-custom {
       background: var(--card-bg);
@@ -250,7 +247,7 @@
   <div class="card-custom">
     <div class="text-center mb-4">
       <h5 class="fw-bold m-0">Attendance & Leave Portal</h5>
-      <p class="text-muted small m-0 mt-1">Direct Sync & Offline Support</p>
+      <p class="text-muted small m-0 mt-1">Field Operations Portal</p>
     </div>
 
     <form id="attendanceForm">
@@ -342,7 +339,7 @@
 
         <div class="mb-0">
           <label class="form-label">Select Leave Date(s) <span class="text-danger">*</span></label>
-          <input type="text" id="leaveDatesPicker" class="form-control" placeholder="Tap to select dates (Multiple selection enabled)">
+          <input type="text" id="leaveDatesPicker" class="form-control" placeholder="Tap to select date or range">
         </div>
       </div>
 
@@ -392,21 +389,18 @@
 <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
 
 <script>
-  // Replace with your Google Apps Script Web App Deployment URL
+  // Paste your Google Apps Script Web App Deployment URL below
   const GAS_API_URL = "https://script.google.com/macros/s/AKfycbyLEMc5wnhuEbJXp7hP5Pmxhs4kKRU5LZABFqyd4ZnqJaWjJaVqUJhnqMFZPhXGUhFO-g/exec";
-
-  // Check-In Window Constraints
-  const CHECKIN_START_TIME = "08:00";
-  const CHECKIN_END_TIME   = "10:30";
 
   let masterRoster = [];
   let map = null;
   let mapMarker = null;
   let capturedLat = null;
   let capturedLng = null;
+  let isMockDetected = false;
   let datePickerInstance = null;
 
-  // Anti-Tampering Variables
+  // Anti-Tampering High-Water Mark Setup
   const loadDateNow = Date.now();
   const loadPerfNow = performance.now();
 
@@ -415,7 +409,6 @@
     navigator.serviceWorker.register('./sw.js').then(reg => reg.update());
   }
 
-  // Application Lifecycle Initialization
   window.addEventListener('load', () => {
     const savedEmail = localStorage.getItem('saved_user_email');
     if (savedEmail) document.getElementById('userEmail').value = savedEmail;
@@ -442,7 +435,7 @@
   window.addEventListener('offline', updateNetworkStatus);
 
   // ----------------------------------------------------
-  // ROSTER DATA LOADING & CACHING
+  // ROSTER MANAGEMENT
   // ----------------------------------------------------
   function loadRosterData() {
     const cachedData = localStorage.getItem('employee_roster_cache');
@@ -453,7 +446,7 @@
           initProjectDropdown();
         }
       } catch (e) {
-        console.warn("Cached roster parsing failed:", e);
+        console.warn("Roster cache read error:", e);
       }
     }
 
@@ -474,9 +467,6 @@
     }
   }
 
-  // ----------------------------------------------------
-  // CASCADING DROPDOWN LOGIC
-  // ----------------------------------------------------
   function initProjectDropdown() {
     const projects = [...new Set(masterRoster.map(e => e.project))].filter(Boolean).sort();
     populateSelect('project', projects, '-- Select Project --');
@@ -595,10 +585,9 @@
   }
 
   // ----------------------------------------------------
-  // ANTI-TAMPERING & TIME VALIDATION (ONLINE & OFFLINE)
+  // TIME ANTI-TAMPERING & CLOCK MONITORING
   // ----------------------------------------------------
   function initAntiTamperingMonitors() {
-    // Record continuous high-water mark timestamp
     setInterval(() => {
       const now = Date.now();
       const currentMax = parseInt(localStorage.getItem('max_historical_timestamp') || '0', 10);
@@ -623,39 +612,30 @@
   async function validateDeviceTime() {
     const currentEpoch = Date.now();
     const maxHistorical = parseInt(localStorage.getItem('max_historical_timestamp') || '0', 10);
-    const lastVerifiedServer = parseInt(localStorage.getItem('last_verified_server_time') || '0', 10);
 
-    // 1. OFFLINE BACKWARD TAMPERING CHECK
-    // If device clock was moved backwards relative to previously recorded activity
-    if (maxHistorical > 0 && currentEpoch < (maxHistorical - 120000)) {
+    // 1. Backward clock tampering check (offline & online)
+    if (maxHistorical > 0 && currentEpoch < (maxHistorical - 60000)) {
       return {
         valid: false,
-        message: "Time Tampering Detected: Your device clock is set earlier than past recorded app entries. Please restore Automatic Date & Time in settings."
+        message: "Manual date/time setting detected. Please set your device date and time settings to 'Automatic' to continue."
       };
     }
 
-    if (lastVerifiedServer > 0 && currentEpoch < (lastVerifiedServer - 120000)) {
-      return {
-        valid: false,
-        message: "Time Tampering Detected: Your device time is earlier than the last verified online time. Please set Date & Time to Automatic."
-      };
-    }
-
-    // 2. LIVE MONOTONIC HARDWARE CLOCK DRIFT CHECK
+    // 2. Hardware vs System clock drift monitor
     const elapsedPerf = (performance.now() - loadPerfNow) / 1000;
     const elapsedDate = (currentEpoch - loadDateNow) / 1000;
-    if (Math.abs(elapsedDate - elapsedPerf) > 60) {
+    if (Math.abs(elapsedDate - elapsedPerf) > 45) {
       return {
         valid: false,
-        message: "Clock Adjustment Detected: System clock was modified while the app was running. Please set Date & Time to Automatic."
+        message: "Manual date/time setting detected. Please set your device date and time settings to 'Automatic' to continue."
       };
     }
 
-    // 3. ONLINE NETWORK TIME SERVER VERIFICATION
+    // 3. Online NTP Server validation
     if (navigator.onLine) {
       try {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 3500);
+        const timeoutId = setTimeout(() => controller.abort(), 3000);
 
         const res = await fetch('https://worldtimeapi.org/api/ip', { signal: controller.signal });
         clearTimeout(timeoutId);
@@ -668,46 +648,68 @@
           if (diffInSeconds > 120) {
             return {
               valid: false,
-              message: "Device Clock Out of Sync: Your phone clock differs from real network time. Please enable Automatic Date & Time in system settings."
+              message: "Manual date/time setting detected. Please set your device date and time settings to 'Automatic' to continue."
             };
-          }
-
-          localStorage.setItem('last_verified_server_time', serverEpoch.toString());
-          if (serverEpoch > maxHistorical) {
-            localStorage.setItem('max_historical_timestamp', serverEpoch.toString());
           }
         }
       } catch (e) {
-        // Fallback to local offline guards if worldtimeapi is unreachable
+        // Fallback to local high-water mark validation if API unreachable
       }
     }
 
     return { valid: true };
   }
 
-  function isCheckInTimeValid() {
-    const now = new Date();
-    const currentMinutes = now.getHours() * 60 + now.getMinutes();
+  // ----------------------------------------------------
+  // MOCK LOCATION & ANTI-SPOOFING RULES
+  // ----------------------------------------------------
+  function fetchGPSLocation() {
+    const locInput = document.getElementById('locationDisplay');
+    locInput.value = "Acquiring GPS coordinates...";
+    isMockDetected = false;
 
-    const [sHours, sMins] = CHECKIN_START_TIME.split(':').map(Number);
-    const startMinutes = sHours * 60 + sMins;
+    if (!("geolocation" in navigator)) {
+      locInput.value = "GPS Not Supported";
+      return;
+    }
 
-    const [eHours, eMins] = CHECKIN_END_TIME.split(':').map(Number);
-    const endMinutes = eHours * 60 + eMins;
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        // Check HTML5 Geolocation mock flags
+        if (position.coords.isMock || position.coords.mocked) {
+          isMockDetected = true;
+        }
 
-    return currentMinutes >= startMinutes && currentMinutes <= endMinutes;
+        // Heuristic detection: 0 accuracy or exact round floats often indicate mock location apps
+        if (position.coords.accuracy === 0) {
+          isMockDetected = true;
+        }
+
+        capturedLat = position.coords.latitude.toFixed(6);
+        capturedLng = position.coords.longitude.toFixed(6);
+        locInput.value = `${capturedLat}, ${capturedLng}`;
+
+        const latLng = [parseFloat(capturedLat), parseFloat(capturedLng)];
+        map.setView(latLng, 16);
+        if (mapMarker) mapMarker.setLatLng(latLng);
+        else mapMarker = L.marker(latLng).addTo(map);
+      },
+      (err) => { 
+        locInput.value = "GPS Access Denied / Unavailable"; 
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    );
   }
 
   // ----------------------------------------------------
-  // DATE / TIME & LOCATION HELPERS
+  // UI & FORM HANDLERS
   // ----------------------------------------------------
   function initDatePicker() {
     datePickerInstance = flatpickr("#leaveDatesPicker", {
-      mode: "multiple",
+      mode: "range",
       dateFormat: "Y-m-d",
       altInput: true,
       altFormat: "d/m/Y",
-      conjunction: ", ",
       minDate: "today"
     });
   }
@@ -731,30 +733,6 @@
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
   }
 
-  function fetchGPSLocation() {
-    const locInput = document.getElementById('locationDisplay');
-    locInput.value = "Acquiring GPS coordinates...";
-
-    if (!("geolocation" in navigator)) {
-      locInput.value = "GPS Not Supported";
-      return;
-    }
-
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        capturedLat = position.coords.latitude.toFixed(6);
-        capturedLng = position.coords.longitude.toFixed(6);
-        locInput.value = `${capturedLat}, ${capturedLng}`;
-        const latLng = [parseFloat(capturedLat), parseFloat(capturedLng)];
-        map.setView(latLng, 16);
-        if (mapMarker) mapMarker.setLatLng(latLng);
-        else mapMarker = L.marker(latLng).addTo(map);
-      },
-      () => { locInput.value = "GPS Access Denied / Unavailable"; },
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-    );
-  }
-
   function updateNetworkStatus() {
     const statusEl = document.getElementById('networkStatus');
     statusEl.className = navigator.onLine ? "chip-badge chip-online" : "chip-badge chip-offline";
@@ -770,29 +748,41 @@
   }
 
   // ----------------------------------------------------
-  // SUBMISSION & DUPLICATE VALIDATION
+  // FORM SUBMISSION & VALIDATION ROUTER
   // ----------------------------------------------------
   document.getElementById('attendanceForm').addEventListener('submit', async function(e) {
     e.preventDefault();
 
     const btn = document.getElementById('submitBtn');
     btn.disabled = true;
-    btn.textContent = "Verifying Time & Rules...";
+    btn.textContent = "Verifying Security Rules...";
 
+    // Rule 5: Mock Location Detection
+    if (isMockDetected) {
+      btn.disabled = false;
+      btn.textContent = "Submit Request";
+      showPopup("Security Block", "Mock location or developer options detected. Please turn off Developer Options and uninstall mock location apps to proceed.", "error");
+      return;
+    }
+
+    // Rule 4: Time Anti-Tampering Check
     const timeCheck = await validateDeviceTime();
     if (!timeCheck.valid) {
       btn.disabled = false;
       btn.textContent = "Submit Request";
-      showPopup("Time Verification Failed", timeCheck.message, "error");
+      showPopup("Security Block", timeCheck.message, "error");
       return;
     }
 
     const type = document.querySelector('input[name="type"]:checked').value;
+    const currentTimeFormatted = document.getElementById('timeDisplay').value;
+    const timePart = currentTimeFormatted.split(' ')[1] || '00:00:00';
 
-    if (type === 'Check-In' && !isCheckInTimeValid()) {
+    // Rule 1: Check-In Cutoff Time Check (< 09:00 AM)
+    if (type === 'Check-In' && timePart >= "09:00:00") {
       btn.disabled = false;
       btn.textContent = "Submit Request";
-      showPopup("Check-In Closed", `Check-In is only permitted between ${CHECKIN_START_TIME} and ${CHECKIN_END_TIME}.`, "error");
+      showPopup("Check-In Closed", "Check-in is only allowed before 9:00 AM.", "error");
       return;
     }
 
@@ -802,7 +792,7 @@
     if (!email || !locVal || locVal.includes("Acquiring") || locVal.includes("Denied")) {
       btn.disabled = false;
       btn.textContent = "Submit Request";
-      showPopup("Form Incomplete", "Please provide a valid official email address and acquire GPS coordinates.", "error");
+      showPopup("Form Incomplete", "Please supply an official email address and ensure valid GPS location.", "error");
       return;
     }
 
@@ -813,7 +803,6 @@
     const name = document.getElementById('fullName').value;
     const desig = document.getElementById('designation').value;
     const remarks = document.getElementById('remarks').value;
-    const currentTimeFormatted = document.getElementById('timeDisplay').value;
 
     let record = {
       uid: 'UID-' + Date.now(),
@@ -835,22 +824,29 @@
       if (!selectedDatesStr) {
         btn.disabled = false;
         btn.textContent = "Submit Request";
-        showPopup("Missing Leave Dates", "Please select one or more leave dates on the calendar.", "warning");
+        showPopup("Missing Dates", "Please select a leave date or date range.", "warning");
         return;
       }
-      const leaveDates = selectedDatesStr.split(', ').map(d => d.trim());
+      
+      // Parse Flatpickr date range selection
+      let leaveDates = [];
+      if (selectedDatesStr.includes(" to ")) {
+        const [startStr, endStr] = selectedDatesStr.split(" to ");
+        const startDate = new Date(startStr);
+        const endDate = new Date(endStr);
+        for (let dt = new Date(startDate); dt <= endDate; dt.setDate(dt.getDate() + 1)) {
+          const yyyy = dt.getFullYear();
+          const mm = String(dt.getMonth() + 1).padStart(2, '0');
+          const dd = String(dt.getDate()).padStart(2, '0');
+          leaveDates.push(`${yyyy}-${mm}-${dd}`);
+        }
+      } else {
+        leaveDates = [selectedDatesStr.trim()];
+      }
+
       record.leaveCategory = document.getElementById('leaveCategory').value;
       record.leaveDates = leaveDates;
       record.time = `${leaveDates[0]} 09:00:00`;
-    }
-
-    // OFFLINE PRE-VALIDATION CHECK AGAINST QUEUE
-    const offlineConflict = checkOfflineQueueConflict(email, name, record);
-    if (offlineConflict) {
-      btn.disabled = false;
-      btn.textContent = "Submit Request";
-      showPopup("Duplicate Conflict", offlineConflict, "error");
-      return;
     }
 
     if (navigator.onLine) {
@@ -863,40 +859,6 @@
       resetForm();
     }
   });
-
-  function checkOfflineQueueConflict(email, name, newRecord) {
-    const queue = JSON.parse(localStorage.getItem('offline_attendance_queue') || '[]');
-    const newEmail = email.toLowerCase();
-    const newName = name.toLowerCase();
-
-    let newDates = [];
-    if (newRecord.type === 'Leave') {
-      newDates = newRecord.leaveDates || [];
-    } else {
-      newDates = [newRecord.time.split(' ')[0]];
-    }
-
-    for (const item of queue) {
-      const itemEmail = (item.email || '').toLowerCase();
-      const itemName = (item.fullName || '').toLowerCase();
-
-      if (itemEmail === newEmail || itemName === newName) {
-        let itemDates = [];
-        if (item.type === 'Leave') {
-          itemDates = item.leaveDates || [];
-        } else {
-          itemDates = [item.time.split(' ')[0]];
-        }
-
-        for (const nd of newDates) {
-          if (itemDates.includes(nd)) {
-            return `A ${item.type} submission for ${nd} is already queued offline.`;
-          }
-        }
-      }
-    }
-    return null;
-  }
 
   function sendToServerDirectly(record) {
     const btn = document.getElementById('submitBtn');
@@ -915,15 +877,11 @@
       if (res.status === 'SUCCESS' || res.status === 'SUCCESS_LEAVE') {
         showPopup("Success", res.message || `${record.type} recorded successfully!`, "success");
         resetForm();
-      } 
-      else if (res.status === 'DATE_CONFLICT') {
-        showPopup("Conflict Detected", res.message, "error");
-      }
-      else if (res.status === 'VALIDATION_FAILED') {
-        showPopup("Notice", res.message, "error");
+      } else if (res.status === 'VALIDATION_FAILED') {
+        showPopup("Validation Failed", res.message, "error");
       } else {
         saveLocallyOffline(record);
-        showPopup("Queued Offline", "Server response error. Record queued locally.", "warning");
+        showPopup("Queued Offline", "Server error encountered. Stored locally.", "warning");
         resetForm();
       }
     })
@@ -931,7 +889,7 @@
       btn.disabled = false;
       btn.textContent = "Submit Request";
       saveLocallyOffline(record);
-      showPopup("Saved Offline", "Connection interrupted. Record queued locally for retry.", "warning");
+      showPopup("Saved Offline", "Network error. Saved offline for auto-sync.", "warning");
       resetForm();
     });
   }
@@ -958,7 +916,7 @@
         });
         const res = await response.json();
         
-        if (res.status === 'SUCCESS' || res.status === 'SUCCESS_LEAVE' || res.status === 'DATE_CONFLICT') {
+        if (res.status === 'SUCCESS' || res.status === 'SUCCESS_LEAVE' || res.status === 'VALIDATION_FAILED') {
           syncedCount++;
         } else {
           remainingQueue.push(record);
@@ -972,7 +930,7 @@
     updateQueueBadge();
 
     if (syncedCount > 0) {
-      showPopup("Auto Sync Complete", `${syncedCount} offline record(s) processed with the server.`, "success");
+      showPopup("Auto Sync Complete", `${syncedCount} offline record(s) processed with server rules.`, "success");
     }
   }
 

@@ -1,69 +1,1037 @@
-/**
- * Attendance & Leave Portal - Service Worker
- */
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
 
-const CACHE_NAME = 'attendance-portal-v3';
+  <title>Attendance & Leave Portal</title>
+  <link rel="manifest" href="manifest.json">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
 
-const PRECACHE_ASSETS = [
-  './',
-  './index.html',
-  './manifest.json',
-  'https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap',
-  'https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css',
-  'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css',
-  'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js',
-  'https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css',
-  'https://cdn.jsdelivr.net/npm/flatpickr'
-];
+  <meta name="theme-color" content="#2563eb">
 
-self.addEventListener('install', (event) => {
-  event.waitUntil(
-    caches.open(CACHE_NAME)
-      .then((cache) => Promise.allSettled(PRECACHE_ASSETS.map(url => cache.add(url))))
-      .then(() => self.skipWaiting())
-  );
-});
+  <style>
+    :root {
+      --bg-body: #f8fafc;
+      --card-bg: #ffffff;
+      --text-main: #0f172a;
+      --text-muted: #64748b;
+      --primary: #2563eb;
+      --border-color: #e2e8f0;
+      --readonly-bg: #f8fafc;
+    }
 
-self.addEventListener('activate', (event) => {
-  event.waitUntil(
-    caches.keys().then((cacheNames) => {
-      return Promise.all(
-        cacheNames.map((cache) => {
-          if (cache !== CACHE_NAME) return caches.delete(cache);
-        })
-      );
-    }).then(() => self.clients.claim())
-  );
-});
+    body {
+      font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+      background-color: var(--bg-body);
+      color: var(--text-main);
+      padding-top: 16px;
+      padding-bottom: 40px;
+      -webkit-font-smoothing: antialiased;
+    }
 
-self.addEventListener('fetch', (event) => {
-  if (event.request.method !== 'GET') return;
+    .app-container { max-width: 480px; margin: 0 auto; }
 
-  event.respondWith(
-    caches.match(event.request).then((cachedResponse) => {
-      if (cachedResponse) {
-        fetch(event.request)
-          .then((networkResponse) => {
-            if (networkResponse && networkResponse.status === 200) {
-              caches.open(CACHE_NAME).then((cache) => cache.put(event.request, networkResponse));
-            }
-          })
-          .catch(() => {});
-        return cachedResponse;
+    .card-custom {
+      background: var(--card-bg);
+      border: 1px solid var(--border-color);
+      border-radius: 20px;
+      box-shadow: 0 4px 20px -2px rgba(15, 23, 42, 0.05);
+      padding: 24px 20px;
+    }
+
+    .status-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+      padding: 0 4px;
+    }
+
+    .chip-badge {
+      font-size: 0.78rem;
+      font-weight: 600;
+      padding: 5px 12px;
+      border-radius: 20px;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      border: 1px solid transparent;
+    }
+
+    .chip-online { background-color: #f0fdf4; color: #166534; border-color: #bbf7d0; }
+    .chip-offline { background-color: #fffbeb; color: #92400e; border-color: #fef3c7; }
+    
+    .chip-sync {
+      background-color: #f1f5f9;
+      color: #334155;
+      border-color: #e2e8f0;
+    }
+
+    .chip-sync.has-pending {
+      background-color: #eff6ff;
+      color: #1e40af;
+      border-color: #bfdbfe;
+    }
+
+    .form-label {
+      font-weight: 600;
+      font-size: 0.8rem;
+      color: #334155;
+      margin-bottom: 6px;
+    }
+
+    .form-select, .form-control {
+      border-radius: 12px;
+      border: 1.5px solid var(--border-color);
+      padding: 11px 14px;
+      font-size: 0.92rem;
+      color: var(--text-main);
+      background-color: #ffffff;
+      transition: all 0.2s ease;
+    }
+
+    .form-select:focus, .form-control:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+    }
+
+    .form-control[readonly] {
+      background-color: var(--readonly-bg);
+      color: #475569;
+      font-weight: 500;
+    }
+
+    .segmented-control {
+      display: flex;
+      background-color: #f1f5f9;
+      padding: 4px;
+      border-radius: 14px;
+      border: 1px solid var(--border-color);
+      gap: 4px;
+    }
+
+    .segmented-control input[type="radio"] { display: none; }
+
+    .segmented-control label {
+      flex: 1;
+      text-align: center;
+      padding: 10px 8px;
+      font-weight: 600;
+      font-size: 0.84rem;
+      color: var(--text-muted);
+      border-radius: 10px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      margin: 0;
+    }
+
+    .segmented-control input[type="radio"]:checked + label {
+      background-color: var(--primary);
+      color: #ffffff;
+      box-shadow: 0 2px 8px rgba(37, 99, 235, 0.25);
+    }
+
+    .segmented-control input[id="typeLeave"]:checked + label {
+      background-color: #eab308 !important;
+      color: #0f172a !important;
+      box-shadow: 0 2px 8px rgba(234, 179, 8, 0.35) !important;
+    }
+
+    .leave-panel {
+      background-color: #fefce8;
+      border: 1.5px solid #fef08a;
+      border-radius: 14px;
+      padding: 16px;
+      margin-bottom: 16px;
+      display: none;
+    }
+
+    .leave-panel.active { display: block; }
+
+    .btn-refresh-icon {
+      background: #f1f5f9;
+      border: 1px solid var(--border-color);
+      color: #475569;
+      width: 28px;
+      height: 28px;
+      border-radius: 8px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      padding: 0;
+    }
+
+    #mapContainer {
+      height: 150px;
+      border-radius: 14px;
+      border: 1.5px solid var(--border-color);
+      margin-bottom: 1rem;
+      overflow: hidden;
+    }
+
+    .btn-submit {
+      background-color: var(--primary);
+      border: none;
+      border-radius: 12px;
+      padding: 13px;
+      font-weight: 600;
+      font-size: 0.98rem;
+      color: #ffffff;
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    .btn-submit:disabled {
+      background-color: #94a3b8;
+      cursor: not-allowed;
+      opacity: 0.85;
+    }
+
+    /* Status Banner Styles */
+    .status-banner {
+      border-radius: 12px;
+      padding: 12px 16px;
+      font-size: 0.86rem;
+      font-weight: 500;
+      margin-bottom: 16px;
+      display: none;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .status-banner.show { display: flex; }
+    .status-banner-info { background-color: #eff6ff; color: #1e40af; border: 1px solid #bfdbfe; }
+    .status-banner-success { background-color: #f0fdf4; color: #166534; border: 1px solid #bbf7d0; }
+    .status-banner-error { background-color: #fef2f2; color: #991b1b; border: 1px solid #fecaca; }
+    .status-banner-warning { background-color: #fffbeb; color: #92400e; border: 1px solid #fef3c7; }
+
+    .popup-backdrop {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100vw; height: 100vh;
+      background: rgba(15, 23, 42, 0.5);
+      backdrop-filter: blur(4px);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 9999;
+      opacity: 0; visibility: hidden;
+      transition: all 0.2s ease;
+      padding: 20px;
+    }
+
+    .popup-backdrop.active { opacity: 1; visibility: visible; }
+
+    .popup-card {
+      background: #ffffff;
+      border-radius: 20px;
+      max-width: 380px; width: 100%;
+      padding: 24px;
+      text-align: center;
+      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.15);
+    }
+
+    .popup-icon {
+      width: 44px; height: 44px;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 20px; font-weight: bold;
+      margin: 0 auto 14px auto;
+    }
+
+    .popup-error .popup-icon { background: #fee2e2; color: #dc2626; }
+    .popup-warning .popup-icon { background: #fef3c7; color: #b45309; }
+    .popup-success .popup-icon { background: #dcfce7; color: #166534; }
+
+    .popup-btn {
+      border: none; border-radius: 10px;
+      padding: 10px 18px; font-weight: 600;
+      width: 100%; margin-top: 16px;
+    }
+
+    .popup-error .popup-btn { background: #dc2626; color: white; }
+    .popup-warning .popup-btn { background: #b45309; color: white; }
+    .popup-success .popup-btn { background: #166534; color: white; }
+  </style>
+</head>
+<body>
+
+<div class="container app-container">
+
+  <div class="status-bar">
+    <span id="networkStatus" class="chip-badge chip-online">● Online</span>
+    <span id="queueStatus" class="chip-badge chip-sync">Sync Queue: 0</span>
+  </div>
+
+  <div class="card-custom">
+    <div class="text-center mb-4">
+      <h5 class="fw-bold m-0">Attendance & Leave Portal</h5>
+      <p class="text-muted small m-0 mt-1">Field Operations Portal</p>
+    </div>
+
+    <!-- Inline Status Banner -->
+    <div id="statusBanner" class="status-banner">
+      <div id="statusBannerIcon"></div>
+      <div id="statusBannerText"></div>
+    </div>
+
+    <form id="attendanceForm">
+      
+      <!-- User Email -->
+      <div class="mb-3">
+        <label class="form-label">Official Email Address <span class="text-danger">*</span></label>
+        <input type="email" id="userEmail" class="form-control" placeholder="name@organization.com" required onchange="localStorage.setItem('saved_user_email', this.value)">
+      </div>
+
+      <!-- Project -->
+      <div class="mb-3">
+        <label class="form-label">Project <span class="text-danger">*</span></label>
+        <select id="project" class="form-select" onchange="onProjectChange()" required>
+          <option value="">-- Loading Projects --</option>
+        </select>
+      </div>
+
+      <!-- Organization -->
+      <div class="mb-3">
+        <label class="form-label">Organization <span class="text-danger">*</span></label>
+        <select id="organization" class="form-select" onchange="onOrganizationChange()" required disabled>
+          <option value="">-- Select Project First --</option>
+        </select>
+      </div>
+
+      <!-- District -->
+      <div class="mb-3">
+        <label class="form-label">District <span class="text-danger">*</span></label>
+        <select id="district" class="form-select" onchange="onDistrictChange()" required disabled>
+          <option value="">-- Select Organization First --</option>
+        </select>
+      </div>
+
+      <!-- Union Council -->
+      <div class="mb-3">
+        <label class="form-label">Union Council <span class="text-danger">*</span></label>
+        <select id="unionCouncil" class="form-select" onchange="onUnionCouncilChange()" required disabled>
+          <option value="">-- Select District First --</option>
+        </select>
+      </div>
+
+      <!-- Full Name -->
+      <div class="mb-3">
+        <label class="form-label">Full Name <span class="text-danger">*</span></label>
+        <select id="fullName" class="form-select" onchange="onFullNameChange()" required disabled>
+          <option value="">-- Select Union Council First --</option>
+        </select>
+      </div>
+
+      <!-- Designation -->
+      <div class="mb-3">
+        <label class="form-label">Designation <span class="text-danger">*</span></label>
+        <select id="designation" class="form-select" required disabled>
+          <option value="">-- Select Full Name First --</option>
+        </select>
+      </div>
+
+      <!-- Attendance Type -->
+      <div class="mb-3">
+        <label class="form-label d-block">Attendance Type <span class="text-danger">*</span></label>
+        <div class="segmented-control">
+          <input type="radio" name="type" id="typeIn" value="Check-In" checked onchange="toggleAttendanceType()">
+          <label for="typeIn">Check-In</label>
+          
+          <input type="radio" name="type" id="typeOut" value="Check-Out" onchange="toggleAttendanceType()">
+          <label for="typeOut">Check-Out</label>
+
+          <input type="radio" name="type" id="typeLeave" value="Leave" onchange="toggleAttendanceType()">
+          <label for="typeLeave">Leave</label>
+        </div>
+      </div>
+
+      <!-- LEAVE PANEL -->
+      <div id="leavePanel" class="leave-panel">
+        <div class="mb-3">
+          <label class="form-label">Leave Category <span class="text-danger">*</span></label>
+          <select id="leaveCategory" class="form-select">
+            <option value="Casual Leave">Casual Leave</option>
+            <option value="Annual Leave">Annual Leave</option>
+            <option value="Sick / Medical Leave">Sick / Medical Leave</option>
+            <option value="Maternity Leave">Maternity Leave</option>
+            <option value="Paternity Leave">Paternity Leave</option>
+            <option value="Compassionate / Bereavement Leave">Compassionate / Bereavement Leave</option>
+            <option value="Unpaid / Without Pay Leave">Unpaid / Without Pay Leave</option>
+            <option value="Other">Other</option>
+          </select>
+        </div>
+
+        <div class="mb-0">
+          <label class="form-label">Select Leave Date(s) <span class="text-danger">*</span></label>
+          <input type="text" id="leaveDatesPicker" class="form-control" placeholder="Tap calendar to select date(s)">
+          <small class="text-muted mt-1 d-block" style="font-size:0.75rem;">Select single or multiple dates from calendar.</small>
+        </div>
+      </div>
+
+      <!-- Time Display -->
+      <div class="mb-3" id="timeFieldContainer">
+        <label class="form-label">Current Date & Time</label>
+        <input type="text" id="timeDisplay" class="form-control" readonly placeholder="Capturing time...">
+      </div>
+
+      <!-- Location -->
+      <div class="mb-2">
+        <div class="d-flex justify-content-between align-items-center mb-1">
+          <label class="form-label m-0">Location</label>
+          <button type="button" class="btn-refresh-icon" title="Refresh Location" onclick="fetchGPSLocation()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" width="14" height="14">
+              <path d="M21.5 2v6h-6M2.5 22v-6h6"/>
+              <path d="M2 11.5a10 10 0 0 1 18.8-4.3L21.5 8M22 12.5a10 10 0 0 1-18.8 4.2L2.5 16"/>
+            </svg>
+          </button>
+        </div>
+        <input type="text" id="locationDisplay" class="form-control" readonly placeholder="Acquiring GPS coordinates...">
+      </div>
+
+      <div id="mapContainer"></div>
+
+      <!-- Remarks -->
+      <div class="mb-4">
+        <label class="form-label">Remarks <span class="text-muted fw-normal">(Optional)</span></label>
+        <textarea id="remarks" class="form-control" rows="2" placeholder="Write any optional notes..."></textarea>
+      </div>
+
+      <!-- Submission Button (Always Visible) -->
+      <button type="submit" id="submitBtn" class="btn btn-submit w-100">
+        <span id="submitBtnText">Submit Request</span>
+      </button>
+    </form>
+  </div>
+</div>
+
+<div id="popupModal" class="popup-backdrop popup-error">
+  <div class="popup-card" tabindex="-1">
+    <div id="popupIcon" class="popup-icon">!</div>
+    <h6 id="popupTitle" class="fw-bold mb-2">Notice</h6>
+    <p id="popupMessage" class="text-muted small mb-0"></p>
+    <button type="button" class="popup-btn" onclick="closePopup()">Acknowledge</button>
+  </div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+
+<script>
+  // Paste your Google Apps Script Web App Deployment URL below
+  const GAS_API_URL = "https://script.google.com/macros/s/AKfycbyLEMc5wnhuEbJXp7hP5Pmxhs4kKRU5LZABFqyd4ZnqJaWjJaVqUJhnqMFZPhXGUhFO-g/exec";
+
+  let masterRoster = [];
+  let map = null;
+  let mapMarker = null;
+  let capturedLat = null;
+  let capturedLng = null;
+  let isMockDetected = false;
+  let datePickerInstance = null;
+
+  // Anti-Tampering High-Water Mark & Clock Drift Tracking
+  const loadDateNow = Date.now();
+  const loadPerfNow = performance.now();
+
+  // Register PWA Service Worker
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('./sw.js').then(reg => reg.update());
+  }
+
+  window.addEventListener('load', () => {
+    const savedEmail = localStorage.getItem('saved_user_email');
+    if (savedEmail) document.getElementById('userEmail').value = savedEmail;
+
+    updateNetworkStatus();
+    initAntiTamperingMonitors();
+    initClock();
+    initLeafletMap();
+    initDatePicker();
+    fetchGPSLocation();
+    
+    loadRosterData();
+    
+    if (navigator.onLine) {
+      syncOfflineQueue();
+    }
+  });
+
+  window.addEventListener('online', () => {
+    updateNetworkStatus();
+    syncOfflineQueue();
+  });
+
+  window.addEventListener('offline', updateNetworkStatus);
+
+  // ----------------------------------------------------
+  // ROSTER MANAGEMENT
+  // ----------------------------------------------------
+  function loadRosterData() {
+    const cachedData = localStorage.getItem('employee_roster_cache');
+    if (cachedData) {
+      try {
+        masterRoster = JSON.parse(cachedData);
+        if (Array.isArray(masterRoster) && masterRoster.length > 0) {
+          initProjectDropdown();
+        }
+      } catch (e) {
+        console.warn("Roster cache read error:", e);
       }
+    }
 
-      return fetch(event.request).then((networkResponse) => {
-        if (!networkResponse || networkResponse.status !== 200 || networkResponse.type !== 'basic') {
-          return networkResponse;
+    if (navigator.onLine) {
+      fetch(GAS_API_URL, {
+        method: 'POST',
+        body: JSON.stringify({ action: 'getEmployees' })
+      })
+      .then(res => res.json())
+      .then(res => {
+        if (res.status === 'SUCCESS' && Array.isArray(res.employees) && res.employees.length > 0) {
+          masterRoster = res.employees;
+          localStorage.setItem('employee_roster_cache', JSON.stringify(masterRoster));
+          initProjectDropdown();
         }
-        const responseToCache = networkResponse.clone();
-        caches.open(CACHE_NAME).then((cache) => cache.put(event.request, responseToCache));
-        return networkResponse;
-      }).catch(() => {
-        if (event.request.headers.get('accept')?.includes('text/html')) {
-          return caches.match('./index.html');
+      })
+      .catch(err => console.error("Roster online sync error:", err));
+    }
+  }
+
+  function initProjectDropdown() {
+    const projects = [...new Set(masterRoster.map(e => e.project))].filter(Boolean).sort();
+    populateSelect('project', projects, '-- Select Project --');
+    resetDependentDropdowns(['organization', 'district', 'unionCouncil', 'fullName', 'designation']);
+  }
+
+  function onProjectChange() {
+    const proj = document.getElementById('project').value;
+    resetDependentDropdowns(['organization', 'district', 'unionCouncil', 'fullName', 'designation']);
+    if (!proj) return;
+
+    const filtered = masterRoster.filter(e => e.project === proj);
+    const orgs = [...new Set(filtered.map(e => e.organization))].filter(Boolean).sort();
+    
+    populateSelect('organization', orgs, '-- Select Organization --');
+    document.getElementById('organization').disabled = false;
+
+    if (orgs.length === 1) {
+      document.getElementById('organization').value = orgs[0];
+      onOrganizationChange();
+    }
+  }
+
+  function onOrganizationChange() {
+    const proj = document.getElementById('project').value;
+    const org = document.getElementById('organization').value;
+    resetDependentDropdowns(['district', 'unionCouncil', 'fullName', 'designation']);
+    if (!org) return;
+
+    const filtered = masterRoster.filter(e => e.project === proj && e.organization === org);
+    const dists = [...new Set(filtered.map(e => e.district))].filter(Boolean).sort();
+
+    populateSelect('district', dists, '-- Select District --');
+    document.getElementById('district').disabled = false;
+
+    if (dists.length === 1) {
+      document.getElementById('district').value = dists[0];
+      onDistrictChange();
+    }
+  }
+
+  function onDistrictChange() {
+    const proj = document.getElementById('project').value;
+    const org = document.getElementById('organization').value;
+    const dist = document.getElementById('district').value;
+    resetDependentDropdowns(['unionCouncil', 'fullName', 'designation']);
+    if (!dist) return;
+
+    const filtered = masterRoster.filter(e => e.project === proj && e.organization === org && e.district === dist);
+    const ucs = [...new Set(filtered.map(e => e.unionCouncil))].filter(Boolean).sort();
+
+    populateSelect('unionCouncil', ucs, '-- Select Union Council --');
+    document.getElementById('unionCouncil').disabled = false;
+
+    if (ucs.length === 1) {
+      document.getElementById('unionCouncil').value = ucs[0];
+      onUnionCouncilChange();
+    }
+  }
+
+  function onUnionCouncilChange() {
+    const proj = document.getElementById('project').value;
+    const org = document.getElementById('organization').value;
+    const dist = document.getElementById('district').value;
+    const uc = document.getElementById('unionCouncil').value;
+    resetDependentDropdowns(['fullName', 'designation']);
+    if (!uc) return;
+
+    const filtered = masterRoster.filter(e => e.project === proj && e.organization === org && e.district === dist && e.unionCouncil === uc);
+    const names = [...new Set(filtered.map(e => e.fullName))].filter(Boolean).sort();
+
+    populateSelect('fullName', names, '-- Select Full Name --');
+    document.getElementById('fullName').disabled = false;
+
+    if (names.length === 1) {
+      document.getElementById('fullName').value = names[0];
+      onFullNameChange();
+    }
+  }
+
+  function onFullNameChange() {
+    const proj = document.getElementById('project').value;
+    const org = document.getElementById('organization').value;
+    const dist = document.getElementById('district').value;
+    const uc = document.getElementById('unionCouncil').value;
+    const name = document.getElementById('fullName').value;
+    resetDependentDropdowns(['designation']);
+    if (!name) return;
+
+    const filtered = masterRoster.filter(e => e.project === proj && e.organization === org && e.district === dist && e.unionCouncil === uc && e.fullName === name);
+    const desigs = [...new Set(filtered.map(e => e.designation))].filter(Boolean).sort();
+
+    populateSelect('designation', desigs, '-- Select Designation --');
+    document.getElementById('designation').disabled = false;
+
+    if (desigs.length === 1) {
+      document.getElementById('designation').value = desigs[0];
+    }
+  }
+
+  function resetDependentDropdowns(dropdownIds) {
+    dropdownIds.forEach(id => {
+      const el = document.getElementById(id);
+      if (el) {
+        el.innerHTML = `<option value="">-- Select Parent Option First --</option>`;
+        el.disabled = true;
+      }
+    });
+  }
+
+  function populateSelect(id, items, placeholder) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.innerHTML = `<option value="">${placeholder}</option>` + 
+      items.map(i => `<option value="${i}">${i}</option>`).join('');
+  }
+
+  // ----------------------------------------------------
+  // RULE 5: SYSTEM TIME ANTI-TAMPERING RULES
+  // ----------------------------------------------------
+  function initAntiTamperingMonitors() {
+    setInterval(() => {
+      const now = Date.now();
+      const currentMax = parseInt(localStorage.getItem('max_historical_timestamp') || '0', 10);
+      if (now > currentMax) {
+        localStorage.setItem('max_historical_timestamp', now.toString());
+      }
+    }, 1000);
+  }
+
+  function initClock() {
+    updateClock();
+    setInterval(updateClock, 1000);
+  }
+
+  function updateClock() {
+    const d = new Date();
+    const pad = n => String(n).padStart(2, '0');
+    const formatted = `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+    document.getElementById('timeDisplay').value = formatted;
+  }
+
+  async function validateDeviceTime() {
+    const currentEpoch = Date.now();
+    const maxHistorical = parseInt(localStorage.getItem('max_historical_timestamp') || '0', 10);
+
+    // Backward clock tampering check (offline & online)
+    if (maxHistorical > 0 && currentEpoch < (maxHistorical - 60000)) {
+      return {
+        valid: false,
+        message: "Manual date/time setting detected. Please set your device settings to 'Automatic Date & Time' to proceed."
+      };
+    }
+
+    // Hardware monotonic counter vs System clock drift monitor
+    const elapsedPerf = (performance.now() - loadPerfNow) / 1000;
+    const elapsedDate = (currentEpoch - loadDateNow) / 1000;
+    if (Math.abs(elapsedDate - elapsedPerf) > 45) {
+      return {
+        valid: false,
+        message: "Manual date/time setting detected. Please set your device settings to 'Automatic Date & Time' to proceed."
+      };
+    }
+
+    // Online NTP Verification
+    if (navigator.onLine) {
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 3000);
+
+        const res = await fetch('https://worldtimeapi.org/api/ip', { signal: controller.signal });
+        clearTimeout(timeoutId);
+
+        if (res.ok) {
+          const data = await res.json();
+          const serverEpoch = new Date(data.datetime).getTime();
+          const diffInSeconds = Math.abs(serverEpoch - currentEpoch) / 1000;
+
+          if (diffInSeconds > 120) {
+            return {
+              valid: false,
+              message: "Manual date/time setting detected. Please set your device settings to 'Automatic Date & Time' to proceed."
+            };
+          }
         }
-      });
+      } catch (e) {
+        // Fallback to local high-water mark validation if API unreachable
+      }
+    }
+
+    return { valid: true };
+  }
+
+  // ----------------------------------------------------
+  // RULE 6: LOCATION INTEGRITY & ANTI-SPOOFING RULES
+  // ----------------------------------------------------
+  function fetchGPSLocation() {
+    const locInput = document.getElementById('locationDisplay');
+    locInput.value = "Acquiring GPS coordinates...";
+    isMockDetected = false;
+
+    if (!("geolocation" in navigator)) {
+      locInput.value = "GPS Not Supported";
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        // Check HTML5 Geolocation mock flags & spoofing indicators
+        if (position.coords.isMock || position.coords.mocked) {
+          isMockDetected = true;
+        }
+
+        // Heuristic detection: 0 accuracy or exact round floats often indicate mock location apps
+        if (position.coords.accuracy === 0) {
+          isMockDetected = true;
+        }
+
+        capturedLat = position.coords.latitude.toFixed(6);
+        capturedLng = position.coords.longitude.toFixed(6);
+        locInput.value = `${capturedLat}, ${capturedLng}`;
+
+        const latLng = [parseFloat(capturedLat), parseFloat(capturedLng)];
+        map.setView(latLng, 16);
+        if (mapMarker) mapMarker.setLatLng(latLng);
+        else mapMarker = L.marker(latLng).addTo(map);
+      },
+      (err) => { 
+        locInput.value = "GPS Access Denied / Unavailable"; 
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    );
+  }
+
+  // ----------------------------------------------------
+  // RULE 3: FLEXIBLE CALENDAR DATE SELECTION
+  // ----------------------------------------------------
+  function initDatePicker() {
+    datePickerInstance = flatpickr("#leaveDatesPicker", {
+      mode: "multiple",
+      dateFormat: "Y-m-d",
+      altInput: true,
+      altFormat: "d/m/Y",
+      conjunction: ", ",
+      minDate: "today"
+    });
+  }
+
+  function toggleAttendanceType() {
+    const isLeave = document.getElementById('typeLeave').checked;
+    const leavePanel = document.getElementById('leavePanel');
+    const timeContainer = document.getElementById('timeFieldContainer');
+
+    if (isLeave) {
+      leavePanel.classList.add('active');
+      timeContainer.style.display = 'none';
+    } else {
+      leavePanel.classList.remove('active');
+      timeContainer.style.display = 'block';
+    }
+  }
+
+  function initLeafletMap() {
+    map = L.map('mapContainer', { zoomControl: true, dragging: true }).setView([20.0, 0.0], 2);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
+  }
+
+  function updateNetworkStatus() {
+    const statusEl = document.getElementById('networkStatus');
+    statusEl.className = navigator.onLine ? "chip-badge chip-online" : "chip-badge chip-offline";
+    statusEl.textContent = navigator.onLine ? "● Online" : "● Offline";
+    updateQueueBadge();
+  }
+
+  function updateQueueBadge() {
+    const queue = JSON.parse(localStorage.getItem('offline_attendance_queue') || '[]');
+    const badge = document.getElementById('queueStatus');
+    badge.className = queue.length > 0 ? "chip-badge chip-sync has-pending" : "chip-badge chip-sync";
+    badge.textContent = `Sync Queue: ${queue.length}`;
+  }
+
+  // ----------------------------------------------------
+  // RULE 4: SUBMIT BUTTON & UI STATE HANDLING
+  // ----------------------------------------------------
+  function setSubmitButtonState(loading, loadingText = "Processing...") {
+    const btn = document.getElementById('submitBtn');
+    const btnText = document.getElementById('submitBtnText');
+    
+    // Ensure button remains visible on UI at all times
+    btn.style.display = 'flex';
+
+    if (loading) {
+      btn.disabled = true;
+      btnText.innerHTML = `<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>${loadingText}`;
+    } else {
+      btn.disabled = false;
+      btnText.textContent = "Submit Request";
+    }
+  }
+
+  function showBannerStatus(message, type = "info") {
+    const banner = document.getElementById('statusBanner');
+    const bannerText = document.getElementById('statusBannerText');
+    const bannerIcon = document.getElementById('statusBannerIcon');
+
+    banner.className = `status-banner status-banner-${type} show`;
+    bannerText.textContent = message;
+
+    if (type === 'info') bannerIcon.textContent = '⏳';
+    else if (type === 'success') bannerIcon.textContent = '✓';
+    else if (type === 'error') bannerIcon.textContent = '✕';
+    else if (type === 'warning') bannerIcon.textContent = '!';
+  }
+
+  function clearBannerStatus() {
+    const banner = document.getElementById('statusBanner');
+    banner.className = 'status-banner';
+  }
+
+  // ----------------------------------------------------
+  // FORM SUBMISSION & VALIDATION ROUTER
+  // ----------------------------------------------------
+  document.getElementById('attendanceForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+
+    // Disable button immediately to prevent double submissions
+    setSubmitButtonState(true, "Verifying Security Rules...");
+    showBannerStatus("Validating system security and location settings...", "info");
+
+    // Rule 6: Location Integrity & Anti-Spoofing Check
+    if (isMockDetected) {
+      setSubmitButtonState(false);
+      const errMsg = "Location tampering risk detected. Please disable Developer Options and uninstall mock location applications to continue.";
+      showBannerStatus(errMsg, "error");
+      showPopup("Security Block", errMsg, "error");
+      return;
+    }
+
+    // Rule 5: Time Anti-Tampering Check
+    const timeCheck = await validateDeviceTime();
+    if (!timeCheck.valid) {
+      setSubmitButtonState(false);
+      showBannerStatus(timeCheck.message, "error");
+      showPopup("Security Block", timeCheck.message, "error");
+      return;
+    }
+
+    const type = document.querySelector('input[name="type"]:checked').value;
+    const currentTimeFormatted = document.getElementById('timeDisplay').value;
+    const timePart = currentTimeFormatted.split(' ')[1] || '00:00:00';
+
+    // Rule 1: Check-In Cutoff Time Check (< 09:00 AM)
+    if (type === 'Check-In' && timePart >= "09:00:00") {
+      setSubmitButtonState(false);
+      const errMsg = "Check-in is only allowed before 9:00 AM.";
+      showBannerStatus(errMsg, "error");
+      showPopup("Check-In Closed", errMsg, "error");
+      return;
+    }
+
+    const email = document.getElementById('userEmail').value.trim();
+    const locVal = document.getElementById('locationDisplay').value;
+
+    if (!email || !locVal || locVal.includes("Acquiring") || locVal.includes("Denied")) {
+      setSubmitButtonState(false);
+      const errMsg = "Please supply an official email address and ensure valid GPS location.";
+      showBannerStatus(errMsg, "warning");
+      showPopup("Form Incomplete", errMsg, "warning");
+      return;
+    }
+
+    const proj = document.getElementById('project').value;
+    const org = document.getElementById('organization').value;
+    const dist = document.getElementById('district').value;
+    const uc = document.getElementById('unionCouncil').value;
+    const name = document.getElementById('fullName').value;
+    const desig = document.getElementById('designation').value;
+    const remarks = document.getElementById('remarks').value;
+
+    let record = {
+      uid: 'UID-' + Date.now(),
+      email: email,
+      project: proj,
+      organization: org,
+      district: dist,
+      unionCouncil: uc,
+      fullName: name,
+      designation: desig,
+      type: type,
+      time: currentTimeFormatted,
+      location: locVal,
+      remarks: remarks
+    };
+
+    // Rule 3: Flexible Date Selection for Leave Submissions
+    if (type === 'Leave') {
+      const selectedDatesRaw = document.getElementById('leaveDatesPicker').value;
+      if (!selectedDatesRaw) {
+        setSubmitButtonState(false);
+        const errMsg = "Please select a leave date or multiple dates from the calendar.";
+        showBannerStatus(errMsg, "warning");
+        showPopup("Missing Dates", errMsg, "warning");
+        return;
+      }
+      
+      const leaveDates = selectedDatesRaw.split(',').map(d => d.trim()).filter(Boolean);
+      record.leaveCategory = document.getElementById('leaveCategory').value;
+      record.leaveDates = leaveDates;
+      record.time = `${leaveDates[0]} 09:00:00`;
+    }
+
+    if (navigator.onLine) {
+      sendToServerDirectly(record);
+    } else {
+      saveLocallyOffline(record);
+      setSubmitButtonState(false);
+      const warnMsg = "Offline mode active. Record stored in queue and will auto-sync when online.";
+      showBannerStatus(warnMsg, "warning");
+      showPopup("Saved Offline", warnMsg, "warning");
+      resetForm();
+    }
+  });
+
+  function sendToServerDirectly(record) {
+    setSubmitButtonState(true, "Submitting Record...");
+    showBannerStatus("Sending record to server...", "info");
+
+    fetch(GAS_API_URL, {
+      method: 'POST',
+      body: JSON.stringify({ action: 'submitAttendance', record: record })
     })
-  );
-});
+    .then(res => res.json())
+    .then(res => {
+      setSubmitButtonState(false);
+
+      if (res.status === 'SUCCESS' || res.status === 'SUCCESS_LEAVE') {
+        const msg = res.message || `${record.type} recorded successfully!`;
+        showBannerStatus(msg, "success");
+        showPopup("Success", msg, "success");
+        resetForm();
+      } else if (res.status === 'VALIDATION_FAILED') {
+        showBannerStatus(res.message, "error");
+        showPopup("Validation Failed", res.message, "error");
+      } else {
+        saveLocallyOffline(record);
+        const msg = "Server error encountered. Stored locally for sync.";
+        showBannerStatus(msg, "warning");
+        showPopup("Queued Offline", msg, "warning");
+        resetForm();
+      }
+    })
+    .catch(() => {
+      setSubmitButtonState(false);
+      saveLocallyOffline(record);
+      const msg = "Network error. Saved offline for auto-sync.";
+      showBannerStatus(msg, "warning");
+      showPopup("Saved Offline", msg, "warning");
+      resetForm();
+    });
+  }
+
+  function saveLocallyOffline(record) {
+    let queue = JSON.parse(localStorage.getItem('offline_attendance_queue') || '[]');
+    queue.push(record);
+    localStorage.setItem('offline_attendance_queue', JSON.stringify(queue));
+    updateQueueBadge();
+  }
+
+  async function syncOfflineQueue() {
+    let queue = JSON.parse(localStorage.getItem('offline_attendance_queue') || '[]');
+    if (queue.length === 0) return;
+
+    let remainingQueue = [];
+    let syncedCount = 0;
+
+    for (const record of queue) {
+      try {
+        const response = await fetch(GAS_API_URL, {
+          method: 'POST',
+          body: JSON.stringify({ action: 'submitAttendance', record: record })
+        });
+        const res = await response.json();
+        
+        if (res.status === 'SUCCESS' || res.status === 'SUCCESS_LEAVE' || res.status === 'VALIDATION_FAILED') {
+          syncedCount++;
+        } else {
+          remainingQueue.push(record);
+        }
+      } catch (err) {
+        remainingQueue.push(record);
+      }
+    }
+
+    localStorage.setItem('offline_attendance_queue', JSON.stringify(remainingQueue));
+    updateQueueBadge();
+
+    if (syncedCount > 0) {
+      showBannerStatus(`${syncedCount} offline record(s) processed.`, "success");
+      showPopup("Auto Sync Complete", `${syncedCount} offline record(s) processed with server rules.`, "success");
+    }
+  }
+
+  function resetForm() {
+    const savedEmail = document.getElementById('userEmail').value;
+    document.getElementById('attendanceForm').reset();
+    document.getElementById('userEmail').value = savedEmail;
+    document.getElementById('typeIn').checked = true;
+    toggleAttendanceType();
+    if (datePickerInstance) datePickerInstance.clear();
+    initProjectDropdown();
+    fetchGPSLocation();
+  }
+
+  function showPopup(title, message, type = "error") {
+    const modal = document.getElementById('popupModal');
+    const icon = document.getElementById('popupIcon');
+    document.getElementById('popupTitle').textContent = title;
+    document.getElementById('popupMessage').textContent = message;
+    
+    modal.className = `popup-backdrop popup-${type} active`;
+    icon.textContent = type === "success" ? "✓" : (type === "warning" ? "!" : "✕");
+  }
+
+  function closePopup() {
+    document.getElementById('popupModal').classList.remove('active');
+  }
+</script>
+</body>
+</html>

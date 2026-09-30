@@ -1,4 +1,4 @@
-const CACHE_NAME = 'attendance-v23';
+const CACHE_NAME = 'attendance-v24';
 
 const ASSETS_TO_CACHE = [
   './',

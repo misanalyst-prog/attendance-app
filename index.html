@@ -1,4 +1,4 @@
-  <!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -367,7 +367,7 @@
         <div class="mb-0">
           <label class="form-label">Select Leave Date(s) <span class="text-danger">*</span></label>
           <input type="text" id="leaveDatesPicker" class="form-control" placeholder="Tap calendar to select date(s)">
-          <small class="text-muted mt-1 d-block" style="font-size:0.75rem;">Select single or multiple non-consecutive dates directly from calendar.</small>
+          <small class="text-muted mt-1 d-block" style="font-size:0.75rem;">Select single or non-consecutive multiple dates directly from calendar.</small>
         </div>
       </div>
 
@@ -420,7 +420,7 @@
 <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
 
 <script>
-  // Replace with your Google Apps Script Web App Deployment URL
+  // Insert your Google Apps Script Web App Deployment URL below
   const GAS_API_URL = "https://script.google.com/macros/s/AKfycbyLEMc5wnhuEbJXp7hP5Pmxhs4kKRU5LZABFqyd4ZnqJaWjJaVqUJhnqMFZPhXGUhFO-g/exec";
 
   let masterRoster = [];
@@ -631,7 +631,7 @@
   function updateClock() {
     const d = new Date();
     const pad = n => String(n).padStart(2, '0');
-    const formatted = `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+    const formatted = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
     document.getElementById('timeDisplay').value = formatted;
   }
 
@@ -642,7 +642,7 @@
     if (maxHistorical > 0 && currentEpoch < (maxHistorical - 60000)) {
       return {
         valid: false,
-        message: "Manual date/time setting detected. Please set device settings to 'Automatic Date & Time'."
+        message: "Manual date/time alteration detected. Please set device settings to 'Automatic Date & Time'."
       };
     }
 
@@ -651,7 +651,7 @@
     if (Math.abs(elapsedDate - elapsedPerf) > 45) {
       return {
         valid: false,
-        message: "Manual date/time setting detected. Please set device settings to 'Automatic Date & Time'."
+        message: "Manual date/time alteration detected. Please set device settings to 'Automatic Date & Time'."
       };
     }
 
@@ -699,9 +699,8 @@
       mode: "multiple",
       dateFormat: "Y-m-d",
       altInput: true,
-      altFormat: "d/m/Y",
-      conjunction: ", ",
-      minDate: "today"
+      altFormat: "Y-m-d",
+      conjunction: ", "
     });
   }
 
@@ -768,17 +767,17 @@
   }
 
   // ----------------------------------------------------
-  // SUBMISSION LOGIC
+  // SUBMISSION LOGIC WITH EXACT STANDARD ERROR MESSAGES
   // ----------------------------------------------------
   document.getElementById('attendanceForm').addEventListener('submit', async function(e) {
     e.preventDefault();
 
-    setSubmitButtonState(true, "Verifying Profile & Security...");
-    showBannerStatus("Validating system integrity...", "info");
+    setSubmitButtonState(true, "Verifying Profile Identity...");
+    showBannerStatus("Validating submission request...", "info");
 
     if (isMockDetected) {
       setSubmitButtonState(false);
-      const errMsg = "Location tampering risk detected. Please disable Developer Options and mock location applications.";
+      const errMsg = "Location spoofing detected. Please disable developer options and mock location tools.";
       showBannerStatus(errMsg, "error");
       showPopup("Security Block", errMsg, "error");
       return;
@@ -804,18 +803,18 @@
 
     if (!dist || !uc || !name || !desig) {
       setSubmitButtonState(false);
-      const errMsg = "District, Union Council, Full Name, and Designation are strictly required for Profile Identity.";
+      const errMsg = "District, Union Council, Full Name, and Designation are required for Composite User Key.";
       showBannerStatus(errMsg, "warning");
       showPopup("Incomplete Composite Key", errMsg, "warning");
       return;
     }
 
-    // Client-side 9:00 AM Check-In Cutoff check
+    // Client-side 09:00 AM Check-In Cutoff check
     if (type === 'Check-In' && timePart >= "09:00:00") {
       setSubmitButtonState(false);
-      const errMsg = "Check-in is only allowed before 9:00 AM.";
+      const errMsg = "Check-In is only permitted before 09:00 AM.";
       showBannerStatus(errMsg, "error");
-      showPopup("Check-In Closed", errMsg, "error");
+      showPopup("Check-In Cutoff", errMsg, "error");
       return;
     }
 
@@ -898,7 +897,7 @@
         resetForm();
       } else if (res.status === 'VALIDATION_FAILED') {
         showBannerStatus(res.message, "error");
-        showPopup("Validation Failed", res.message, "error");
+        showPopup("Validation Notice", res.message, "error");
       } else {
         saveLocallyOffline(record);
         const msg = "Server busy. Stored locally for offline sync.";

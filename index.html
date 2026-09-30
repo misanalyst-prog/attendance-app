@@ -392,9 +392,10 @@
 <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
 
 <script>
+  // Replace with your Google Apps Script Web App Deployment URL
   const GAS_API_URL = "https://script.google.com/macros/s/AKfycbyLEMc5wnhuEbJXp7hP5Pmxhs4kKRU5LZABFqyd4ZnqJaWjJaVqUJhnqMFZPhXGUhFO-g/exec";
 
-  // CHECK-IN TIME WINDOW
+  // Check-In Time Constraint Window
   const CHECKIN_START_TIME = "08:00";
   const CHECKIN_END_TIME   = "10:30";
 
@@ -406,10 +407,12 @@
   let datePickerInstance = null;
   let isClockTamperedOffline = false;
 
+  // Register PWA Service Worker
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('./sw.js').then(reg => reg.update());
   }
 
+  // Application Lifecycle Initialization
   window.addEventListener('load', () => {
     const savedEmail = localStorage.getItem('saved_user_email');
     if (savedEmail) document.getElementById('userEmail').value = savedEmail;
@@ -434,6 +437,164 @@
 
   window.addEventListener('offline', updateNetworkStatus);
 
+  // ----------------------------------------------------
+  // ROSTER DATA LOADING (LOCALSTORAGE & NETWORK SYNC)
+  // ----------------------------------------------------
+  function loadRosterData() {
+    // 1. Instant Load from LocalStorage Cache
+    const cachedData = localStorage.getItem('employee_roster_cache');
+    if (cachedData) {
+      try {
+        masterRoster = JSON.parse(cachedData);
+        if (Array.isArray(masterRoster) && masterRoster.length > 0) {
+          initProjectDropdown();
+        }
+      } catch (e) {
+        console.warn("Cached roster parsing failed:", e);
+      }
+    }
+
+    // 2. Fetch fresh data from Employee List sheet when online
+    if (navigator.onLine) {
+      fetch(GAS_API_URL, {
+        method: 'POST',
+        body: JSON.stringify({ action: 'getEmployees' })
+      })
+      .then(res => res.json())
+      .then(res => {
+        if (res.status === 'SUCCESS' && Array.isArray(res.employees) && res.employees.length > 0) {
+          masterRoster = res.employees;
+          localStorage.setItem('employee_roster_cache', JSON.stringify(masterRoster));
+          initProjectDropdown();
+        }
+      })
+      .catch(err => console.error("Roster online sync error:", err));
+    }
+  }
+
+  // ----------------------------------------------------
+  // CASCADING DROPDOWN LOGIC
+  // ----------------------------------------------------
+  function initProjectDropdown() {
+    const projects = [...new Set(masterRoster.map(e => e.project))].filter(Boolean).sort();
+    populateSelect('project', projects, '-- Select Project --');
+    resetDependentDropdowns(['organization', 'district', 'unionCouncil', 'fullName', 'designation']);
+  }
+
+  function onProjectChange() {
+    const proj = document.getElementById('project').value;
+    resetDependentDropdowns(['organization', 'district', 'unionCouncil', 'fullName', 'designation']);
+    if (!proj) return;
+
+    const filtered = masterRoster.filter(e => e.project === proj);
+    const orgs = [...new Set(filtered.map(e => e.organization))].filter(Boolean).sort();
+    
+    populateSelect('organization', orgs, '-- Select Organization --');
+    document.getElementById('organization').disabled = false;
+
+    if (orgs.length === 1) {
+      document.getElementById('organization').value = orgs[0];
+      onOrganizationChange();
+    }
+  }
+
+  function onOrganizationChange() {
+    const proj = document.getElementById('project').value;
+    const org = document.getElementById('organization').value;
+    resetDependentDropdowns(['district', 'unionCouncil', 'fullName', 'designation']);
+    if (!org) return;
+
+    const filtered = masterRoster.filter(e => e.project === proj && e.organization === org);
+    const dists = [...new Set(filtered.map(e => e.district))].filter(Boolean).sort();
+
+    populateSelect('district', dists, '-- Select District --');
+    document.getElementById('district').disabled = false;
+
+    if (dists.length === 1) {
+      document.getElementById('district').value = dists[0];
+      onDistrictChange();
+    }
+  }
+
+  function onDistrictChange() {
+    const proj = document.getElementById('project').value;
+    const org = document.getElementById('organization').value;
+    const dist = document.getElementById('district').value;
+    resetDependentDropdowns(['unionCouncil', 'fullName', 'designation']);
+    if (!dist) return;
+
+    const filtered = masterRoster.filter(e => e.project === proj && e.organization === org && e.district === dist);
+    const ucs = [...new Set(filtered.map(e => e.unionCouncil))].filter(Boolean).sort();
+
+    populateSelect('unionCouncil', ucs, '-- Select Union Council --');
+    document.getElementById('unionCouncil').disabled = false;
+
+    if (ucs.length === 1) {
+      document.getElementById('unionCouncil').value = ucs[0];
+      onUnionCouncilChange();
+    }
+  }
+
+  function onUnionCouncilChange() {
+    const proj = document.getElementById('project').value;
+    const org = document.getElementById('organization').value;
+    const dist = document.getElementById('district').value;
+    const uc = document.getElementById('unionCouncil').value;
+    resetDependentDropdowns(['fullName', 'designation']);
+    if (!uc) return;
+
+    const filtered = masterRoster.filter(e => e.project === proj && e.organization === org && e.district === dist && e.unionCouncil === uc);
+    const names = [...new Set(filtered.map(e => e.fullName))].filter(Boolean).sort();
+
+    populateSelect('fullName', names, '-- Select Full Name --');
+    document.getElementById('fullName').disabled = false;
+
+    if (names.length === 1) {
+      document.getElementById('fullName').value = names[0];
+      onFullNameChange();
+    }
+  }
+
+  function onFullNameChange() {
+    const proj = document.getElementById('project').value;
+    const org = document.getElementById('organization').value;
+    const dist = document.getElementById('district').value;
+    const uc = document.getElementById('unionCouncil').value;
+    const name = document.getElementById('fullName').value;
+    resetDependentDropdowns(['designation']);
+    if (!name) return;
+
+    const filtered = masterRoster.filter(e => e.project === proj && e.organization === org && e.district === dist && e.unionCouncil === uc && e.fullName === name);
+    const desigs = [...new Set(filtered.map(e => e.designation))].filter(Boolean).sort();
+
+    populateSelect('designation', desigs, '-- Select Designation --');
+    document.getElementById('designation').disabled = false;
+
+    if (desigs.length === 1) {
+      document.getElementById('designation').value = desigs[0];
+    }
+  }
+
+  function resetDependentDropdowns(dropdownIds) {
+    dropdownIds.forEach(id => {
+      const el = document.getElementById(id);
+      if (el) {
+        el.innerHTML = `<option value="">-- Select Parent Option First --</option>`;
+        el.disabled = true;
+      }
+    });
+  }
+
+  function populateSelect(id, items, placeholder) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.innerHTML = `<option value="">${placeholder}</option>` + 
+      items.map(i => `<option value="${i}">${i}</option>`).join('');
+  }
+
+  // ----------------------------------------------------
+  // DATE / TIME & LOCATION HELPERS
+  // ----------------------------------------------------
   function initDatePicker() {
     datePickerInstance = flatpickr("#leaveDatesPicker", {
       mode: "multiple",
@@ -466,7 +627,6 @@
     const now = Date.now();
     const lastSeen = parseInt(localStorage.getItem('sys_last_seen_time') || '0', 10);
 
-    // Detect manual back-and-forth clock tinkering when offline
     if (lastSeen > 0 && Math.abs(now - lastSeen) > 120000 && !navigator.onLine) {
       isClockTamperedOffline = true;
     } else {
@@ -479,14 +639,11 @@
     document.getElementById('timeDisplay').value = formatted;
   }
 
-  // --- AUTOMATIC TIME VALIDATION (ONLINE & OFFLINE) ---
   async function validateDeviceTime() {
-    // 1. Check offline tamper lock
     if (!navigator.onLine && isClockTamperedOffline) {
       return { valid: false, message: "Manual date/time change detected offline. Please set your device Date & Time to Automatic and connect to the internet." };
     }
 
-    // 2. Validate against network timestamp when online
     if (navigator.onLine) {
       try {
         const controller = new AbortController();
@@ -501,17 +658,16 @@
           const deviceEpoch = Date.now();
           const diffInSeconds = Math.abs(serverEpoch - deviceEpoch) / 1000;
 
-          // If difference is greater than 120 seconds (2 minutes), clock is manual/wrong
           if (diffInSeconds > 120) {
             return {
               valid: false,
               message: "Incorrect Date & Time detected. Please open your device Settings and set 'Date & Time' to AUTOMATIC before submitting."
             };
           }
-          isClockTamperedOffline = false; // Reset lock once verified online
+          isClockTamperedOffline = false;
         }
       } catch (err) {
-        // Fallback to local execution if network time fetch fails
+        // Fallback to local execution if public time server is unreachable
       }
     }
 
@@ -574,113 +730,9 @@
     badge.textContent = `Sync Queue: ${queue.length}`;
   }
 
-  function loadRosterData() {
-    const cachedRoster = localStorage.getItem('employee_roster_cache');
-    
-    if (cachedRoster) {
-      masterRoster = JSON.parse(cachedRoster);
-      initProjectDropdown();
-    }
-
-    if (navigator.onLine) {
-      fetch(GAS_API_URL, {
-        method: 'POST',
-        body: JSON.stringify({ action: 'getEmployees' })
-      })
-      .then(res => res.json())
-      .then(res => {
-        if (res.status === 'SUCCESS' && res.employees && res.employees.length > 0) {
-          masterRoster = res.employees;
-          localStorage.setItem('employee_roster_cache', JSON.stringify(masterRoster));
-          initProjectDropdown();
-        }
-      })
-      .catch(() => {});
-    }
-  }
-
-  function initProjectDropdown() {
-    const projects = [...new Set(masterRoster.map(e => e.project))].filter(Boolean);
-    populateSelect('project', projects, '-- Select Project --');
-    resetDependentDropdowns(['organization', 'district', 'unionCouncil', 'fullName', 'designation']);
-  }
-
-  function onProjectChange() {
-    const proj = document.getElementById('project').value;
-    resetDependentDropdowns(['organization', 'district', 'unionCouncil', 'fullName', 'designation']);
-    if (!proj) return;
-
-    const filtered = masterRoster.filter(e => e.project === proj);
-    populateSelect('organization', [...new Set(filtered.map(e => e.organization))].filter(Boolean), '-- Select Organization --');
-    document.getElementById('organization').disabled = false;
-  }
-
-  function onOrganizationChange() {
-    const proj = document.getElementById('project').value;
-    const org = document.getElementById('organization').value;
-    resetDependentDropdowns(['district', 'unionCouncil', 'fullName', 'designation']);
-    if (!org) return;
-
-    const filtered = masterRoster.filter(e => e.project === proj && e.organization === org);
-    populateSelect('district', [...new Set(filtered.map(e => e.district))].filter(Boolean), '-- Select District --');
-    document.getElementById('district').disabled = false;
-  }
-
-  function onDistrictChange() {
-    const proj = document.getElementById('project').value;
-    const org = document.getElementById('organization').value;
-    const dist = document.getElementById('district').value;
-    resetDependentDropdowns(['unionCouncil', 'fullName', 'designation']);
-    if (!dist) return;
-
-    const filtered = masterRoster.filter(e => e.project === proj && e.organization === org && e.district === dist);
-    populateSelect('unionCouncil', [...new Set(filtered.map(e => e.unionCouncil))].filter(Boolean), '-- Select Union Council --');
-    document.getElementById('unionCouncil').disabled = false;
-  }
-
-  function onUnionCouncilChange() {
-    const proj = document.getElementById('project').value;
-    const org = document.getElementById('organization').value;
-    const dist = document.getElementById('district').value;
-    const uc = document.getElementById('unionCouncil').value;
-    resetDependentDropdowns(['fullName', 'designation']);
-    if (!uc) return;
-
-    const filtered = masterRoster.filter(e => e.project === proj && e.organization === org && e.district === dist && e.unionCouncil === uc);
-    populateSelect('fullName', [...new Set(filtered.map(e => e.fullName))].filter(Boolean), '-- Select Full Name --');
-    document.getElementById('fullName').disabled = false;
-  }
-
-  function onFullNameChange() {
-    const proj = document.getElementById('project').value;
-    const org = document.getElementById('organization').value;
-    const dist = document.getElementById('district').value;
-    const uc = document.getElementById('unionCouncil').value;
-    const name = document.getElementById('fullName').value;
-    resetDependentDropdowns(['designation']);
-    if (!name) return;
-
-    const filtered = masterRoster.filter(e => e.project === proj && e.organization === org && e.district === dist && e.unionCouncil === uc && e.fullName === name);
-    const desigs = [...new Set(filtered.map(e => e.designation))].filter(Boolean);
-    populateSelect('designation', desigs, '-- Select Designation --');
-    document.getElementById('designation').disabled = false;
-    if (desigs.length === 1) document.getElementById('designation').value = desigs[0];
-  }
-
-  function resetDependentDropdowns(dropdownIds) {
-    dropdownIds.forEach(id => {
-      const el = document.getElementById(id);
-      el.innerHTML = `<option value="">-- Select Parent Option First --</option>`;
-      el.disabled = true;
-    });
-  }
-
-  function populateSelect(id, items, placeholder) {
-    const el = document.getElementById(id);
-    el.innerHTML = `<option value="">${placeholder}</option>` + items.map(i => `<option value="${i}">${i}</option>`).join('');
-  }
-
-  // --- SUBMISSION HANDLER WITH AUTOMATIC TIME ENFORCEMENT ---
+  // ----------------------------------------------------
+  // SUBMISSION & OFFLINE QUEUE SYNC
+  // ----------------------------------------------------
   document.getElementById('attendanceForm').addEventListener('submit', async function(e) {
     e.preventDefault();
 
@@ -688,7 +740,6 @@
     btn.disabled = true;
     btn.textContent = "Verifying Time...";
 
-    // 1. Verify Automatic Date & Time Status
     const timeCheck = await validateDeviceTime();
     if (!timeCheck.valid) {
       btn.disabled = false;
@@ -699,7 +750,6 @@
 
     const type = document.querySelector('input[name="type"]:checked').value;
 
-    // 2. Check-In Window Constraint
     if (type === 'Check-In' && !isCheckInTimeValid()) {
       btn.disabled = false;
       btn.textContent = "Submit Request";

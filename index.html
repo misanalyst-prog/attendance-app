@@ -186,7 +186,36 @@
       font-weight: 600;
       font-size: 0.98rem;
       color: #ffffff;
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
     }
+
+    .btn-submit:disabled {
+      background-color: #94a3b8;
+      cursor: not-allowed;
+      opacity: 0.85;
+    }
+
+    /* Status Banner Styles */
+    .status-banner {
+      border-radius: 12px;
+      padding: 12px 16px;
+      font-size: 0.86rem;
+      font-weight: 500;
+      margin-bottom: 16px;
+      display: none;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .status-banner.show { display: flex; }
+    .status-banner-info { background-color: #eff6ff; color: #1e40af; border: 1px solid #bfdbfe; }
+    .status-banner-success { background-color: #f0fdf4; color: #166534; border: 1px solid #bbf7d0; }
+    .status-banner-error { background-color: #fef2f2; color: #991b1b; border: 1px solid #fecaca; }
+    .status-banner-warning { background-color: #fffbeb; color: #92400e; border: 1px solid #fef3c7; }
 
     .popup-backdrop {
       position: fixed;
@@ -248,6 +277,12 @@
     <div class="text-center mb-4">
       <h5 class="fw-bold m-0">Attendance & Leave Portal</h5>
       <p class="text-muted small m-0 mt-1">Field Operations Portal</p>
+    </div>
+
+    <!-- Inline Status Banner -->
+    <div id="statusBanner" class="status-banner">
+      <div id="statusBannerIcon"></div>
+      <div id="statusBannerText"></div>
     </div>
 
     <form id="attendanceForm">
@@ -339,7 +374,8 @@
 
         <div class="mb-0">
           <label class="form-label">Select Leave Date(s) <span class="text-danger">*</span></label>
-          <input type="text" id="leaveDatesPicker" class="form-control" placeholder="Tap to select date or range">
+          <input type="text" id="leaveDatesPicker" class="form-control" placeholder="Tap calendar to select date(s)">
+          <small class="text-muted mt-1 d-block" style="font-size:0.75rem;">Select single or multiple dates from calendar.</small>
         </div>
       </div>
 
@@ -371,7 +407,10 @@
         <textarea id="remarks" class="form-control" rows="2" placeholder="Write any optional notes..."></textarea>
       </div>
 
-      <button type="submit" id="submitBtn" class="btn btn-submit w-100">Submit Request</button>
+      <!-- Submission Button (Always Visible) -->
+      <button type="submit" id="submitBtn" class="btn btn-submit w-100">
+        <span id="submitBtnText">Submit Request</span>
+      </button>
     </form>
   </div>
 </div>
@@ -400,7 +439,7 @@
   let isMockDetected = false;
   let datePickerInstance = null;
 
-  // Anti-Tampering High-Water Mark Setup
+  // Anti-Tampering High-Water Mark & Clock Drift Tracking
   const loadDateNow = Date.now();
   const loadPerfNow = performance.now();
 
@@ -585,7 +624,7 @@
   }
 
   // ----------------------------------------------------
-  // TIME ANTI-TAMPERING & CLOCK MONITORING
+  // RULE 5: SYSTEM TIME ANTI-TAMPERING RULES
   // ----------------------------------------------------
   function initAntiTamperingMonitors() {
     setInterval(() => {
@@ -613,25 +652,25 @@
     const currentEpoch = Date.now();
     const maxHistorical = parseInt(localStorage.getItem('max_historical_timestamp') || '0', 10);
 
-    // 1. Backward clock tampering check (offline & online)
+    // Backward clock tampering check (offline & online)
     if (maxHistorical > 0 && currentEpoch < (maxHistorical - 60000)) {
       return {
         valid: false,
-        message: "Manual date/time setting detected. Please set your device date and time settings to 'Automatic' to continue."
+        message: "Manual date/time setting detected. Please set your device settings to 'Automatic Date & Time' to proceed."
       };
     }
 
-    // 2. Hardware vs System clock drift monitor
+    // Hardware monotonic counter vs System clock drift monitor
     const elapsedPerf = (performance.now() - loadPerfNow) / 1000;
     const elapsedDate = (currentEpoch - loadDateNow) / 1000;
     if (Math.abs(elapsedDate - elapsedPerf) > 45) {
       return {
         valid: false,
-        message: "Manual date/time setting detected. Please set your device date and time settings to 'Automatic' to continue."
+        message: "Manual date/time setting detected. Please set your device settings to 'Automatic Date & Time' to proceed."
       };
     }
 
-    // 3. Online NTP Server validation
+    // Online NTP Verification
     if (navigator.onLine) {
       try {
         const controller = new AbortController();
@@ -648,7 +687,7 @@
           if (diffInSeconds > 120) {
             return {
               valid: false,
-              message: "Manual date/time setting detected. Please set your device date and time settings to 'Automatic' to continue."
+              message: "Manual date/time setting detected. Please set your device settings to 'Automatic Date & Time' to proceed."
             };
           }
         }
@@ -661,7 +700,7 @@
   }
 
   // ----------------------------------------------------
-  // MOCK LOCATION & ANTI-SPOOFING RULES
+  // RULE 6: LOCATION INTEGRITY & ANTI-SPOOFING RULES
   // ----------------------------------------------------
   function fetchGPSLocation() {
     const locInput = document.getElementById('locationDisplay');
@@ -675,7 +714,7 @@
 
     navigator.geolocation.getCurrentPosition(
       (position) => {
-        // Check HTML5 Geolocation mock flags
+        // Check HTML5 Geolocation mock flags & spoofing indicators
         if (position.coords.isMock || position.coords.mocked) {
           isMockDetected = true;
         }
@@ -702,14 +741,15 @@
   }
 
   // ----------------------------------------------------
-  // UI & FORM HANDLERS
+  // RULE 3: FLEXIBLE CALENDAR DATE SELECTION
   // ----------------------------------------------------
   function initDatePicker() {
     datePickerInstance = flatpickr("#leaveDatesPicker", {
-      mode: "range",
+      mode: "multiple",
       dateFormat: "Y-m-d",
       altInput: true,
       altFormat: "d/m/Y",
+      conjunction: ", ",
       minDate: "today"
     });
   }
@@ -748,28 +788,67 @@
   }
 
   // ----------------------------------------------------
+  // RULE 4: SUBMIT BUTTON & UI STATE HANDLING
+  // ----------------------------------------------------
+  function setSubmitButtonState(loading, loadingText = "Processing...") {
+    const btn = document.getElementById('submitBtn');
+    const btnText = document.getElementById('submitBtnText');
+    
+    // Ensure button remains visible on UI at all times
+    btn.style.display = 'flex';
+
+    if (loading) {
+      btn.disabled = true;
+      btnText.innerHTML = `<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>${loadingText}`;
+    } else {
+      btn.disabled = false;
+      btnText.textContent = "Submit Request";
+    }
+  }
+
+  function showBannerStatus(message, type = "info") {
+    const banner = document.getElementById('statusBanner');
+    const bannerText = document.getElementById('statusBannerText');
+    const bannerIcon = document.getElementById('statusBannerIcon');
+
+    banner.className = `status-banner status-banner-${type} show`;
+    bannerText.textContent = message;
+
+    if (type === 'info') bannerIcon.textContent = '⏳';
+    else if (type === 'success') bannerIcon.textContent = '✓';
+    else if (type === 'error') bannerIcon.textContent = '✕';
+    else if (type === 'warning') bannerIcon.textContent = '!';
+  }
+
+  function clearBannerStatus() {
+    const banner = document.getElementById('statusBanner');
+    banner.className = 'status-banner';
+  }
+
+  // ----------------------------------------------------
   // FORM SUBMISSION & VALIDATION ROUTER
   // ----------------------------------------------------
   document.getElementById('attendanceForm').addEventListener('submit', async function(e) {
     e.preventDefault();
 
-    const btn = document.getElementById('submitBtn');
-    btn.disabled = true;
-    btn.textContent = "Verifying Security Rules...";
+    // Disable button immediately to prevent double submissions
+    setSubmitButtonState(true, "Verifying Security Rules...");
+    showBannerStatus("Validating system security and location settings...", "info");
 
-    // Rule 5: Mock Location Detection
+    // Rule 6: Location Integrity & Anti-Spoofing Check
     if (isMockDetected) {
-      btn.disabled = false;
-      btn.textContent = "Submit Request";
-      showPopup("Security Block", "Mock location or developer options detected. Please turn off Developer Options and uninstall mock location apps to proceed.", "error");
+      setSubmitButtonState(false);
+      const errMsg = "Location tampering risk detected. Please disable Developer Options and uninstall mock location applications to continue.";
+      showBannerStatus(errMsg, "error");
+      showPopup("Security Block", errMsg, "error");
       return;
     }
 
-    // Rule 4: Time Anti-Tampering Check
+    // Rule 5: Time Anti-Tampering Check
     const timeCheck = await validateDeviceTime();
     if (!timeCheck.valid) {
-      btn.disabled = false;
-      btn.textContent = "Submit Request";
+      setSubmitButtonState(false);
+      showBannerStatus(timeCheck.message, "error");
       showPopup("Security Block", timeCheck.message, "error");
       return;
     }
@@ -780,9 +859,10 @@
 
     // Rule 1: Check-In Cutoff Time Check (< 09:00 AM)
     if (type === 'Check-In' && timePart >= "09:00:00") {
-      btn.disabled = false;
-      btn.textContent = "Submit Request";
-      showPopup("Check-In Closed", "Check-in is only allowed before 9:00 AM.", "error");
+      setSubmitButtonState(false);
+      const errMsg = "Check-in is only allowed before 9:00 AM.";
+      showBannerStatus(errMsg, "error");
+      showPopup("Check-In Closed", errMsg, "error");
       return;
     }
 
@@ -790,9 +870,10 @@
     const locVal = document.getElementById('locationDisplay').value;
 
     if (!email || !locVal || locVal.includes("Acquiring") || locVal.includes("Denied")) {
-      btn.disabled = false;
-      btn.textContent = "Submit Request";
-      showPopup("Form Incomplete", "Please supply an official email address and ensure valid GPS location.", "error");
+      setSubmitButtonState(false);
+      const errMsg = "Please supply an official email address and ensure valid GPS location.";
+      showBannerStatus(errMsg, "warning");
+      showPopup("Form Incomplete", errMsg, "warning");
       return;
     }
 
@@ -819,31 +900,18 @@
       remarks: remarks
     };
 
+    // Rule 3: Flexible Date Selection for Leave Submissions
     if (type === 'Leave') {
-      const selectedDatesStr = document.getElementById('leaveDatesPicker').value;
-      if (!selectedDatesStr) {
-        btn.disabled = false;
-        btn.textContent = "Submit Request";
-        showPopup("Missing Dates", "Please select a leave date or date range.", "warning");
+      const selectedDatesRaw = document.getElementById('leaveDatesPicker').value;
+      if (!selectedDatesRaw) {
+        setSubmitButtonState(false);
+        const errMsg = "Please select a leave date or multiple dates from the calendar.";
+        showBannerStatus(errMsg, "warning");
+        showPopup("Missing Dates", errMsg, "warning");
         return;
       }
       
-      // Parse Flatpickr date range selection
-      let leaveDates = [];
-      if (selectedDatesStr.includes(" to ")) {
-        const [startStr, endStr] = selectedDatesStr.split(" to ");
-        const startDate = new Date(startStr);
-        const endDate = new Date(endStr);
-        for (let dt = new Date(startDate); dt <= endDate; dt.setDate(dt.getDate() + 1)) {
-          const yyyy = dt.getFullYear();
-          const mm = String(dt.getMonth() + 1).padStart(2, '0');
-          const dd = String(dt.getDate()).padStart(2, '0');
-          leaveDates.push(`${yyyy}-${mm}-${dd}`);
-        }
-      } else {
-        leaveDates = [selectedDatesStr.trim()];
-      }
-
+      const leaveDates = selectedDatesRaw.split(',').map(d => d.trim()).filter(Boolean);
       record.leaveCategory = document.getElementById('leaveCategory').value;
       record.leaveDates = leaveDates;
       record.time = `${leaveDates[0]} 09:00:00`;
@@ -853,17 +921,17 @@
       sendToServerDirectly(record);
     } else {
       saveLocallyOffline(record);
-      btn.disabled = false;
-      btn.textContent = "Submit Request";
-      showPopup("Saved Offline", "Offline mode active. Record stored in queue and will auto-sync when online.", "warning");
+      setSubmitButtonState(false);
+      const warnMsg = "Offline mode active. Record stored in queue and will auto-sync when online.";
+      showBannerStatus(warnMsg, "warning");
+      showPopup("Saved Offline", warnMsg, "warning");
       resetForm();
     }
   });
 
   function sendToServerDirectly(record) {
-    const btn = document.getElementById('submitBtn');
-    btn.disabled = true;
-    btn.textContent = "Submitting...";
+    setSubmitButtonState(true, "Submitting Record...");
+    showBannerStatus("Sending record to server...", "info");
 
     fetch(GAS_API_URL, {
       method: 'POST',
@@ -871,25 +939,30 @@
     })
     .then(res => res.json())
     .then(res => {
-      btn.disabled = false;
-      btn.textContent = "Submit Request";
+      setSubmitButtonState(false);
 
       if (res.status === 'SUCCESS' || res.status === 'SUCCESS_LEAVE') {
-        showPopup("Success", res.message || `${record.type} recorded successfully!`, "success");
+        const msg = res.message || `${record.type} recorded successfully!`;
+        showBannerStatus(msg, "success");
+        showPopup("Success", msg, "success");
         resetForm();
       } else if (res.status === 'VALIDATION_FAILED') {
+        showBannerStatus(res.message, "error");
         showPopup("Validation Failed", res.message, "error");
       } else {
         saveLocallyOffline(record);
-        showPopup("Queued Offline", "Server error encountered. Stored locally.", "warning");
+        const msg = "Server error encountered. Stored locally for sync.";
+        showBannerStatus(msg, "warning");
+        showPopup("Queued Offline", msg, "warning");
         resetForm();
       }
     })
     .catch(() => {
-      btn.disabled = false;
-      btn.textContent = "Submit Request";
+      setSubmitButtonState(false);
       saveLocallyOffline(record);
-      showPopup("Saved Offline", "Network error. Saved offline for auto-sync.", "warning");
+      const msg = "Network error. Saved offline for auto-sync.";
+      showBannerStatus(msg, "warning");
+      showPopup("Saved Offline", msg, "warning");
       resetForm();
     });
   }
@@ -930,6 +1003,7 @@
     updateQueueBadge();
 
     if (syncedCount > 0) {
+      showBannerStatus(`${syncedCount} offline record(s) processed.`, "success");
       showPopup("Auto Sync Complete", `${syncedCount} offline record(s) processed with server rules.`, "success");
     }
   }

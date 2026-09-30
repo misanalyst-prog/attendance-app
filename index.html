@@ -367,7 +367,7 @@
         <div class="mb-0">
           <label class="form-label">Select Leave Date(s) <span class="text-danger">*</span></label>
           <input type="text" id="leaveDatesPicker" class="form-control" placeholder="Tap calendar to select date(s)">
-          <small class="text-muted mt-1 d-block" style="font-size:0.75rem;">Select single or non-consecutive multiple dates directly from calendar.</small>
+          <small class="text-muted mt-1 d-block" style="font-size:0.75rem;">Past dates are disabled. Select current or future date(s) only.</small>
         </div>
       </div>
 
@@ -692,7 +692,7 @@
   }
 
   // ----------------------------------------------------
-  // CALENDAR & UI HELPERS
+  // CALENDAR & UI HELPERS (MIN DATE = TODAY RESTRICTION)
   // ----------------------------------------------------
   function initDatePicker() {
     datePickerInstance = flatpickr("#leaveDatesPicker", {
@@ -700,7 +700,8 @@
       dateFormat: "Y-m-d",
       altInput: true,
       altFormat: "Y-m-d",
-      conjunction: ", "
+      conjunction: ", ",
+      minDate: "today" // RESTRICTS SELECTION OF PAST DATES
     });
   }
 
@@ -856,6 +857,18 @@
       }
       
       const leaveDates = selectedDatesRaw.split(',').map(d => d.trim()).filter(Boolean);
+      
+      // Client-side past date check
+      const todayStr = new Date().toISOString().split('T')[0];
+      const hasPastDate = leaveDates.some(d => d < todayStr);
+      if (hasPastDate) {
+        setSubmitButtonState(false);
+        const errMsg = "Leave request blocked: Cannot select past dates on the calendar.";
+        showBannerStatus(errMsg, "error");
+        showPopup("Invalid Date", errMsg, "error");
+        return;
+      }
+
       record.leaveCategory = document.getElementById('leaveCategory').value;
       record.leaveDates = leaveDates;
       record.time = `${leaveDates[0]} 09:00:00`;

@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+  <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -275,7 +275,7 @@
   <div class="card-custom">
     <div class="text-center mb-4">
       <h5 class="fw-bold m-0">Attendance & Leave Portal</h5>
-      <p class="text-muted small m-0 mt-1">Composite Key Profile Verification</p>
+      <p class="text-muted small m-0 mt-1">Composite Key: District + UC + Name + Designation + Type</p>
     </div>
 
     <div id="statusBanner" class="status-banner">
@@ -325,7 +325,7 @@
         </select>
       </div>
 
-      <!-- Designation -->
+      <!-- Designation (Composite Key Element 4) -->
       <div class="mb-3">
         <label class="form-label">Designation <span class="text-danger">*</span></label>
         <select id="designation" class="form-select" required disabled>
@@ -333,7 +333,7 @@
         </select>
       </div>
 
-      <!-- Attendance Type -->
+      <!-- Attendance Type (Composite Key Element 5) -->
       <div class="mb-3">
         <label class="form-label d-block">Attendance Type <span class="text-danger">*</span></label>
         <div class="segmented-control">
@@ -399,7 +399,7 @@
         <textarea id="remarks" class="form-control" rows="2" placeholder="Write any optional notes..."></textarea>
       </div>
 
-      <!-- Submission Button (Always Visible) -->
+      <!-- Submission Button -->
       <button type="submit" id="submitBtn" class="btn btn-submit w-100">
         <span id="submitBtnText">Submit Request</span>
       </button>
@@ -420,7 +420,7 @@
 <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
 
 <script>
-  // Paste your Google Apps Script Web App Deployment URL below
+  // Replace with your Google Apps Script Web App Deployment URL
   const GAS_API_URL = "https://script.google.com/macros/s/AKfycbyLEMc5wnhuEbJXp7hP5Pmxhs4kKRU5LZABFqyd4ZnqJaWjJaVqUJhnqMFZPhXGUhFO-g/exec";
 
   let masterRoster = [];
@@ -642,7 +642,7 @@
     if (maxHistorical > 0 && currentEpoch < (maxHistorical - 60000)) {
       return {
         valid: false,
-        message: "Manual date/time setting detected. Please set your device settings to 'Automatic Date & Time' to proceed."
+        message: "Manual date/time setting detected. Please set device settings to 'Automatic Date & Time'."
       };
     }
 
@@ -651,7 +651,7 @@
     if (Math.abs(elapsedDate - elapsedPerf) > 45) {
       return {
         valid: false,
-        message: "Manual date/time setting detected. Please set your device settings to 'Automatic Date & Time' to proceed."
+        message: "Manual date/time setting detected. Please set device settings to 'Automatic Date & Time'."
       };
     }
 
@@ -768,7 +768,7 @@
   }
 
   // ----------------------------------------------------
-  // SUBMISSION LOGIC & CLIENT-SIDE CHECKS
+  // SUBMISSION LOGIC
   // ----------------------------------------------------
   document.getElementById('attendanceForm').addEventListener('submit', async function(e) {
     e.preventDefault();
@@ -778,7 +778,7 @@
 
     if (isMockDetected) {
       setSubmitButtonState(false);
-      const errMsg = "Location tampering risk detected. Please disable Developer Options and uninstall mock location applications to continue.";
+      const errMsg = "Location tampering risk detected. Please disable Developer Options and mock location applications.";
       showBannerStatus(errMsg, "error");
       showPopup("Security Block", errMsg, "error");
       return;
@@ -802,11 +802,11 @@
     const currentTimeFormatted = document.getElementById('timeDisplay').value;
     const timePart = currentTimeFormatted.split(' ')[1] || '00:00:00';
 
-    if (!dist || !uc || !name) {
+    if (!dist || !uc || !name || !desig) {
       setSubmitButtonState(false);
-      const errMsg = "District, Union Council, and Full Name are strictly required to establish User Identity.";
+      const errMsg = "District, Union Council, Full Name, and Designation are strictly required for Profile Identity.";
       showBannerStatus(errMsg, "warning");
-      showPopup("Missing Identity Fields", errMsg, "warning");
+      showPopup("Incomplete Composite Key", errMsg, "warning");
       return;
     }
 
@@ -941,9 +941,6 @@
         
         if (res.status === 'SUCCESS' || res.status === 'SUCCESS_LEAVE' || res.status === 'DUPLICATE_IGNORED' || res.status === 'VALIDATION_FAILED') {
           syncedCount++;
-          if (res.status === 'VALIDATION_FAILED' || res.status === 'DUPLICATE_IGNORED') {
-            console.warn("Offline record processed with status:", res.message);
-          }
         } else {
           remainingQueue.push(record);
         }

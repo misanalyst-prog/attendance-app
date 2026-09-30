@@ -1,6 +1,12 @@
-const CACHE_NAME = 'attendance-v25';
+/**
+ * Attendance & Leave Portal - Service Worker
+ * Pre-caches UI assets, CSS libraries, and Leaflet maps for 100% offline access.
+ */
 
-const ASSETS_TO_CACHE = [
+const CACHE_NAME = 'attendance-v26';
+
+// Static app shell and external CDN resources to cache for offline use
+const PRECACHE_ASSETS = [
   './',
   './index.html',
   './manifest.json',
@@ -12,20 +18,21 @@ const ASSETS_TO_CACHE = [
   'https://cdn.jsdelivr.net/npm/flatpickr'
 ];
 
-// Install Event - Pre-cache App Shell & Critical Static Assets
+// 1. Install Event - Cache essential app resources
 self.addEventListener('install', (event) => {
-  self.skipWaiting();
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      // Gracefully handle caching so one failed network request doesn't ruin SW installation
-      return Promise.allSettled(
-        ASSETS_TO_CACHE.map((url) => cache.add(url))
-      );
-    })
+    caches.open(CACHE_NAME)
+      .then((cache) => {
+        // Cache core assets individually to prevent single fail-blocking
+        return Promise.allSettled(
+          PRECACHE_ASSETS.map(url => cache.add(url))
+        );
+      })
+      .then(() => self.skipWaiting())
   );
 });
 
-// Activate Event - Clean up old caches
+// 2. Activate Event - Clean up outdated caches
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((cacheNames) => {
@@ -40,52 +47,51 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-// Fetch Event - Intercept Requests
+// 3. Fetch Event - Cache-First with Stale-While-Revalidate Network Fallback
 self.addEventListener('fetch', (event) => {
-  const requestUrl = new URL(event.request.url);
-
-  // 1. Skip non-GET requests, Google Apps Script API calls, and Time API checks
-  if (
-    event.request.method !== 'GET' || 
-    requestUrl.hostname.includes('script.google.com') ||
-    requestUrl.hostname.includes('worldtimeapi.org') ||
-    requestUrl.hostname.includes('tile.openstreetmap.org') // OpenStreetMap tiles are optional to cache dynamically
-  ) {
+  // Let POST requests (Apps Script submissions) bypass SW caching logic
+  if (event.request.method !== 'GET') {
     return;
   }
 
-  // 2. Cache-First Strategy with Network Fallback & Auto-Cache Update
   event.respondWith(
     caches.match(event.request).then((cachedResponse) => {
+      // Serve cached asset immediately if available
       if (cachedResponse) {
-        // Fetch background update for cache freshness if online
-        fetch(event.request).then((networkResponse) => {
-          if (networkResponse && (networkResponse.status === 200 || networkResponse.type === 'opaque')) {
-            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, networkResponse));
-          }
-        }).catch(() => {/* Ignore network errors while offline */});
+        // Background update cache when online
+        fetch(event.request)
+          .then((networkResponse) => {
+            if (networkResponse && networkResponse.status === 200) {
+              caches.open(CACHE_NAME).then((cache) => {
+                cache.put(event.request, networkResponse);
+              });
+            }
+          })
+          .catch(() => { /* Offline silence */ });
 
         return cachedResponse;
       }
 
-      // If not cached, fetch from network and add to cache
-      return fetch(event.request).then((networkResponse) => {
-        if (
-          !networkResponse || 
-          (networkResponse.status !== 200 && networkResponse.type !== 'opaque')
-        ) {
-          return networkResponse;
-        }
+      // Fetch from network if not cached
+      return fetch(event.request)
+        .then((networkResponse) => {
+          if (!networkResponse || networkResponse.status !== 200 || networkResponse.type !== 'basic') {
+            return networkResponse;
+          }
 
-        const responseToCache = networkResponse.clone();
-        caches.open(CACHE_NAME).then((cache) => cache.put(event.request, responseToCache));
-        return networkResponse;
-      }).catch(() => {
-        // Offline fallback for navigation requests
-        if (event.request.mode === 'navigate') {
-          return caches.match('./index.html') || caches.match('./');
-        }
-      });
+          const responseToCache = networkResponse.clone();
+          caches.open(CACHE_NAME).then((cache) => {
+            cache.put(event.request, responseToCache);
+          });
+
+          return networkResponse;
+        })
+        .catch(() => {
+          // Return cached index page for HTML navigation requests offline
+          if (event.request.headers.get('accept')?.includes('text/html')) {
+            return caches.match('./index.html');
+          }
+        });
     })
   );
 });

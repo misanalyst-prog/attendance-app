@@ -3,7 +3,7 @@
  * Pre-caches UI assets, CSS libraries, and Leaflet maps for 100% offline access.
  */
 
-const CACHE_NAME = 'attendance-v26';
+const CACHE_NAME = 'attendance-v27';
 
 // Static app shell and external CDN resources to cache for offline use
 const PRECACHE_ASSETS = [

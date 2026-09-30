@@ -602,10 +602,14 @@
   function initProjectDropdown() {
     const projects = [...new Set(masterRoster.map(e => e.project))].filter(Boolean);
     populateSelect('project', projects, '-- Select Project --');
+    resetDependentDropdowns(['organization', 'district', 'unionCouncil', 'fullName', 'designation']);
   }
 
   function onProjectChange() {
     const proj = document.getElementById('project').value;
+    resetDependentDropdowns(['organization', 'district', 'unionCouncil', 'fullName', 'designation']);
+    if (!proj) return;
+
     const filtered = masterRoster.filter(e => e.project === proj);
     populateSelect('organization', [...new Set(filtered.map(e => e.organization))].filter(Boolean), '-- Select Organization --');
     document.getElementById('organization').disabled = false;
@@ -614,6 +618,9 @@
   function onOrganizationChange() {
     const proj = document.getElementById('project').value;
     const org = document.getElementById('organization').value;
+    resetDependentDropdowns(['district', 'unionCouncil', 'fullName', 'designation']);
+    if (!org) return;
+
     const filtered = masterRoster.filter(e => e.project === proj && e.organization === org);
     populateSelect('district', [...new Set(filtered.map(e => e.district))].filter(Boolean), '-- Select District --');
     document.getElementById('district').disabled = false;
@@ -623,6 +630,9 @@
     const proj = document.getElementById('project').value;
     const org = document.getElementById('organization').value;
     const dist = document.getElementById('district').value;
+    resetDependentDropdowns(['unionCouncil', 'fullName', 'designation']);
+    if (!dist) return;
+
     const filtered = masterRoster.filter(e => e.project === proj && e.organization === org && e.district === dist);
     populateSelect('unionCouncil', [...new Set(filtered.map(e => e.unionCouncil))].filter(Boolean), '-- Select Union Council --');
     document.getElementById('unionCouncil').disabled = false;
@@ -633,6 +643,9 @@
     const org = document.getElementById('organization').value;
     const dist = document.getElementById('district').value;
     const uc = document.getElementById('unionCouncil').value;
+    resetDependentDropdowns(['fullName', 'designation']);
+    if (!uc) return;
+
     const filtered = masterRoster.filter(e => e.project === proj && e.organization === org && e.district === dist && e.unionCouncil === uc);
     populateSelect('fullName', [...new Set(filtered.map(e => e.fullName))].filter(Boolean), '-- Select Full Name --');
     document.getElementById('fullName').disabled = false;
@@ -644,11 +657,22 @@
     const dist = document.getElementById('district').value;
     const uc = document.getElementById('unionCouncil').value;
     const name = document.getElementById('fullName').value;
+    resetDependentDropdowns(['designation']);
+    if (!name) return;
+
     const filtered = masterRoster.filter(e => e.project === proj && e.organization === org && e.district === dist && e.unionCouncil === uc && e.fullName === name);
     const desigs = [...new Set(filtered.map(e => e.designation))].filter(Boolean);
     populateSelect('designation', desigs, '-- Select Designation --');
     document.getElementById('designation').disabled = false;
     if (desigs.length === 1) document.getElementById('designation').value = desigs[0];
+  }
+
+  function resetDependentDropdowns(dropdownIds) {
+    dropdownIds.forEach(id => {
+      const el = document.getElementById(id);
+      el.innerHTML = `<option value="">-- Select Parent Option First --</option>`;
+      el.disabled = true;
+    });
   }
 
   function populateSelect(id, items, placeholder) {

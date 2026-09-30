@@ -275,7 +275,7 @@
   <div class="card-custom">
     <div class="text-center mb-4">
       <h5 class="fw-bold m-0">Attendance & Leave Portal</h5>
-      <p class="text-muted small m-0 mt-1">Field Operations Portal</p>
+      <p class="text-muted small m-0 mt-1">Composite Key Profile Verification</p>
     </div>
 
     <div id="statusBanner" class="status-banner">
@@ -285,12 +285,6 @@
 
     <form id="attendanceForm">
       
-      <!-- User Email -->
-      <div class="mb-3">
-        <label class="form-label">Official Email Address <span class="text-danger">*</span></label>
-        <input type="email" id="userEmail" class="form-control" placeholder="name@organization.com" required onchange="localStorage.setItem('saved_user_email', this.value)">
-      </div>
-
       <!-- Project -->
       <div class="mb-3">
         <label class="form-label">Project <span class="text-danger">*</span></label>
@@ -307,7 +301,7 @@
         </select>
       </div>
 
-      <!-- District -->
+      <!-- District (Composite Key Element 1) -->
       <div class="mb-3">
         <label class="form-label">District <span class="text-danger">*</span></label>
         <select id="district" class="form-select" onchange="onDistrictChange()" required disabled>
@@ -315,7 +309,7 @@
         </select>
       </div>
 
-      <!-- Union Council -->
+      <!-- Union Council (Composite Key Element 2) -->
       <div class="mb-3">
         <label class="form-label">Union Council <span class="text-danger">*</span></label>
         <select id="unionCouncil" class="form-select" onchange="onUnionCouncilChange()" required disabled>
@@ -323,7 +317,7 @@
         </select>
       </div>
 
-      <!-- Full Name -->
+      <!-- Full Name (Composite Key Element 3) -->
       <div class="mb-3">
         <label class="form-label">Full Name <span class="text-danger">*</span></label>
         <select id="fullName" class="form-select" onchange="onFullNameChange()" required disabled>
@@ -373,7 +367,7 @@
         <div class="mb-0">
           <label class="form-label">Select Leave Date(s) <span class="text-danger">*</span></label>
           <input type="text" id="leaveDatesPicker" class="form-control" placeholder="Tap calendar to select date(s)">
-          <small class="text-muted mt-1 d-block" style="font-size:0.75rem;">Select single or multiple dates directly from calendar.</small>
+          <small class="text-muted mt-1 d-block" style="font-size:0.75rem;">Select single or multiple non-consecutive dates directly from calendar.</small>
         </div>
       </div>
 
@@ -437,19 +431,14 @@
   let isMockDetected = false;
   let datePickerInstance = null;
 
-  // Anti-Tampering High-Water Mark & Clock Drift Tracking
   const loadDateNow = Date.now();
   const loadPerfNow = performance.now();
 
-  // Register PWA Service Worker
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('./sw.js').then(reg => reg.update());
   }
 
   window.addEventListener('load', () => {
-    const savedEmail = localStorage.getItem('saved_user_email');
-    if (savedEmail) document.getElementById('userEmail').value = savedEmail;
-
     updateNetworkStatus();
     initAntiTamperingMonitors();
     initClock();
@@ -622,7 +611,7 @@
   }
 
   // ----------------------------------------------------
-  // RULE 5: SYSTEM TIME ANTI-TAMPERING RULES
+  // ANTI-TAMPERING & TIME MONITORS
   // ----------------------------------------------------
   function initAntiTamperingMonitors() {
     setInterval(() => {
@@ -650,7 +639,6 @@
     const currentEpoch = Date.now();
     const maxHistorical = parseInt(localStorage.getItem('max_historical_timestamp') || '0', 10);
 
-    // Backward clock tampering check (offline & online)
     if (maxHistorical > 0 && currentEpoch < (maxHistorical - 60000)) {
       return {
         valid: false,
@@ -658,7 +646,6 @@
       };
     }
 
-    // Hardware monotonic counter vs System clock drift monitor
     const elapsedPerf = (performance.now() - loadPerfNow) / 1000;
     const elapsedDate = (currentEpoch - loadDateNow) / 1000;
     if (Math.abs(elapsedDate - elapsedPerf) > 45) {
@@ -668,37 +655,11 @@
       };
     }
 
-    // Online NTP Verification
-    if (navigator.onLine) {
-      try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 3000);
-
-        const res = await fetch('https://worldtimeapi.org/api/ip', { signal: controller.signal });
-        clearTimeout(timeoutId);
-
-        if (res.ok) {
-          const data = await res.json();
-          const serverEpoch = new Date(data.datetime).getTime();
-          const diffInSeconds = Math.abs(serverEpoch - currentEpoch) / 1000;
-
-          if (diffInSeconds > 120) {
-            return {
-              valid: false,
-              message: "Manual date/time setting detected. Please set your device settings to 'Automatic Date & Time' to proceed."
-            };
-          }
-        }
-      } catch (e) {
-        // Fallback to local high-water mark validation if API unreachable
-      }
-    }
-
     return { valid: true };
   }
 
   // ----------------------------------------------------
-  // RULE 6: LOCATION INTEGRITY & ANTI-SPOOFING RULES
+  // LOCATION GPS & ANTI-SPOOFING
   // ----------------------------------------------------
   function fetchGPSLocation() {
     const locInput = document.getElementById('locationDisplay');
@@ -712,13 +673,7 @@
 
     navigator.geolocation.getCurrentPosition(
       (position) => {
-        // Check HTML5 Geolocation mock flags & spoofing indicators
-        if (position.coords.isMock || position.coords.mocked) {
-          isMockDetected = true;
-        }
-
-        // Heuristic detection: 0 accuracy or exact round floats often indicate mock location apps
-        if (position.coords.accuracy === 0) {
+        if (position.coords.isMock || position.coords.mocked || position.coords.accuracy === 0) {
           isMockDetected = true;
         }
 
@@ -731,15 +686,13 @@
         if (mapMarker) mapMarker.setLatLng(latLng);
         else mapMarker = L.marker(latLng).addTo(map);
       },
-      (err) => { 
-        locInput.value = "GPS Access Denied / Unavailable"; 
-      },
+      () => { locInput.value = "GPS Access Denied / Unavailable"; },
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
     );
   }
 
   // ----------------------------------------------------
-  // RULE 3: FLEXIBLE CALENDAR DATE SELECTION
+  // CALENDAR & UI HELPERS
   // ----------------------------------------------------
   function initDatePicker() {
     datePickerInstance = flatpickr("#leaveDatesPicker", {
@@ -785,14 +738,10 @@
     badge.textContent = `Sync Queue: ${queue.length}`;
   }
 
-  // ----------------------------------------------------
-  // RULE 4: SUBMIT BUTTON & UI STATE HANDLING
-  // ----------------------------------------------------
   function setSubmitButtonState(loading, loadingText = "Processing...") {
     const btn = document.getElementById('submitBtn');
     const btnText = document.getElementById('submitBtnText');
     
-    // Ensure button remains visible on UI at all times
     btn.style.display = 'flex';
 
     if (loading) {
@@ -818,22 +767,15 @@
     else if (type === 'warning') bannerIcon.textContent = '!';
   }
 
-  function clearBannerStatus() {
-    const banner = document.getElementById('statusBanner');
-    banner.className = 'status-banner';
-  }
-
   // ----------------------------------------------------
-  // FORM SUBMISSION & VALIDATION ROUTER
+  // SUBMISSION LOGIC & CLIENT-SIDE CHECKS
   // ----------------------------------------------------
   document.getElementById('attendanceForm').addEventListener('submit', async function(e) {
     e.preventDefault();
 
-    // Disable button immediately to prevent double submissions / race conditions
-    setSubmitButtonState(true, "Verifying Security Rules...");
-    showBannerStatus("Validating system security and location settings...", "info");
+    setSubmitButtonState(true, "Verifying Profile & Security...");
+    showBannerStatus("Validating system integrity...", "info");
 
-    // Rule 6: Location Integrity & Anti-Spoofing Check
     if (isMockDetected) {
       setSubmitButtonState(false);
       const errMsg = "Location tampering risk detected. Please disable Developer Options and uninstall mock location applications to continue.";
@@ -842,36 +784,11 @@
       return;
     }
 
-    // Rule 5: Time Anti-Tampering Check
     const timeCheck = await validateDeviceTime();
     if (!timeCheck.valid) {
       setSubmitButtonState(false);
       showBannerStatus(timeCheck.message, "error");
       showPopup("Security Block", timeCheck.message, "error");
-      return;
-    }
-
-    const type = document.querySelector('input[name="type"]:checked').value;
-    const currentTimeFormatted = document.getElementById('timeDisplay').value;
-    const timePart = currentTimeFormatted.split(' ')[1] || '00:00:00';
-
-    // Rule 1: Check-In Cutoff Time Check (< 09:00 AM)
-    if (type === 'Check-In' && timePart >= "09:00:00") {
-      setSubmitButtonState(false);
-      const errMsg = "Check-in is only allowed before 9:00 AM.";
-      showBannerStatus(errMsg, "error");
-      showPopup("Check-In Closed", errMsg, "error");
-      return;
-    }
-
-    const email = document.getElementById('userEmail').value.trim();
-    const locVal = document.getElementById('locationDisplay').value;
-
-    if (!email || !locVal || locVal.includes("Acquiring") || locVal.includes("Denied")) {
-      setSubmitButtonState(false);
-      const errMsg = "Please supply an official email address and ensure valid GPS location.";
-      showBannerStatus(errMsg, "warning");
-      showPopup("Form Incomplete", errMsg, "warning");
       return;
     }
 
@@ -881,15 +798,42 @@
     const uc = document.getElementById('unionCouncil').value;
     const name = document.getElementById('fullName').value;
     const desig = document.getElementById('designation').value;
-    const remarks = document.getElementById('remarks').value;
+    const type = document.querySelector('input[name="type"]:checked').value;
+    const currentTimeFormatted = document.getElementById('timeDisplay').value;
+    const timePart = currentTimeFormatted.split(' ')[1] || '00:00:00';
 
-    // Generate unique Request ID for backend idempotency
+    if (!dist || !uc || !name) {
+      setSubmitButtonState(false);
+      const errMsg = "District, Union Council, and Full Name are strictly required to establish User Identity.";
+      showBannerStatus(errMsg, "warning");
+      showPopup("Missing Identity Fields", errMsg, "warning");
+      return;
+    }
+
+    // Client-side 9:00 AM Check-In Cutoff check
+    if (type === 'Check-In' && timePart >= "09:00:00") {
+      setSubmitButtonState(false);
+      const errMsg = "Check-in is only allowed before 9:00 AM.";
+      showBannerStatus(errMsg, "error");
+      showPopup("Check-In Closed", errMsg, "error");
+      return;
+    }
+
+    const locVal = document.getElementById('locationDisplay').value;
+    if (!locVal || locVal.includes("Acquiring") || locVal.includes("Denied")) {
+      setSubmitButtonState(false);
+      const errMsg = "Please ensure valid GPS location before submitting.";
+      showBannerStatus(errMsg, "warning");
+      showPopup("GPS Required", errMsg, "warning");
+      return;
+    }
+
+    const remarks = document.getElementById('remarks').value;
     const requestId = 'REQ-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
 
     let record = {
       uid: 'UID-' + Date.now(),
       requestId: requestId,
-      email: email,
       project: proj,
       organization: org,
       district: dist,
@@ -902,12 +846,11 @@
       remarks: remarks
     };
 
-    // Rule 3: Flexible Date Selection for Leave Submissions
     if (type === 'Leave') {
       const selectedDatesRaw = document.getElementById('leaveDatesPicker').value;
       if (!selectedDatesRaw) {
         setSubmitButtonState(false);
-        const errMsg = "Please select a leave date or multiple dates from the calendar.";
+        const errMsg = "Please select leave date(s) directly from the calendar.";
         showBannerStatus(errMsg, "warning");
         showPopup("Missing Dates", errMsg, "warning");
         return;
@@ -924,16 +867,16 @@
     } else {
       saveLocallyOffline(record);
       setSubmitButtonState(false);
-      const warnMsg = "Offline mode active. Record stored in queue and will auto-sync when online.";
+      const warnMsg = "Offline mode active. Record queued locally and will auto-sync when online.";
       showBannerStatus(warnMsg, "warning");
-      showPopup("Saved Offline", warnMsg, "warning");
+      showPopup("Stored Offline", warnMsg, "warning");
       resetForm();
     }
   });
 
   function sendToServerDirectly(record) {
     setSubmitButtonState(true, "Submitting Record...");
-    showBannerStatus("Sending record to server...", "info");
+    showBannerStatus("Syncing with Google Sheets...", "info");
 
     fetch(GAS_API_URL, {
       method: 'POST',
@@ -953,7 +896,7 @@
         showPopup("Validation Failed", res.message, "error");
       } else {
         saveLocallyOffline(record);
-        const msg = "Server error encountered. Stored locally for sync.";
+        const msg = "Server busy. Stored locally for offline sync.";
         showBannerStatus(msg, "warning");
         showPopup("Queued Offline", msg, "warning");
         resetForm();
@@ -993,6 +936,9 @@
         
         if (res.status === 'SUCCESS' || res.status === 'SUCCESS_LEAVE' || res.status === 'VALIDATION_FAILED') {
           syncedCount++;
+          if (res.status === 'VALIDATION_FAILED') {
+            console.warn("Offline record dropped due to rule violation:", res.message);
+          }
         } else {
           remainingQueue.push(record);
         }
@@ -1005,15 +951,13 @@
     updateQueueBadge();
 
     if (syncedCount > 0) {
-      showBannerStatus(`${syncedCount} offline record(s) processed.`, "success");
-      showPopup("Auto Sync Complete", `${syncedCount} offline record(s) processed with server rules.`, "success");
+      showBannerStatus(`${syncedCount} offline record(s) processed and synced!`, "success");
+      showPopup("Offline Sync Complete", `${syncedCount} queued record(s) processed with server rules.`, "success");
     }
   }
 
   function resetForm() {
-    const savedEmail = document.getElementById('userEmail').value;
     document.getElementById('attendanceForm').reset();
-    document.getElementById('userEmail').value = savedEmail;
     document.getElementById('typeIn').checked = true;
     toggleAttendanceType();
     if (datePickerInstance) datePickerInstance.clear();

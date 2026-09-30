@@ -891,6 +891,11 @@
         showBannerStatus(msg, "success");
         showPopup("Success", msg, "success");
         resetForm();
+      } else if (res.status === 'DUPLICATE_IGNORED') {
+        const msg = res.message || `${record.type} already processed for this date.`;
+        showBannerStatus(msg, "info");
+        showPopup("Already Recorded", msg, "warning");
+        resetForm();
       } else if (res.status === 'VALIDATION_FAILED') {
         showBannerStatus(res.message, "error");
         showPopup("Validation Failed", res.message, "error");
@@ -934,10 +939,10 @@
         });
         const res = await response.json();
         
-        if (res.status === 'SUCCESS' || res.status === 'SUCCESS_LEAVE' || res.status === 'VALIDATION_FAILED') {
+        if (res.status === 'SUCCESS' || res.status === 'SUCCESS_LEAVE' || res.status === 'DUPLICATE_IGNORED' || res.status === 'VALIDATION_FAILED') {
           syncedCount++;
-          if (res.status === 'VALIDATION_FAILED') {
-            console.warn("Offline record dropped due to rule violation:", res.message);
+          if (res.status === 'VALIDATION_FAILED' || res.status === 'DUPLICATE_IGNORED') {
+            console.warn("Offline record processed with status:", res.message);
           }
         } else {
           remainingQueue.push(record);

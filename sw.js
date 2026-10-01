@@ -2,7 +2,7 @@
  * Attendance & Leave Portal - Offline Service Worker
  */
 
-const CACHE_NAME = 'attendance-portal-v9';
+const CACHE_NAME = 'attendance-portal-v10';
 
 const PRECACHE_ASSETS = [
   './',

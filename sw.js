@@ -1,63 +1,65 @@
 /**
- * Attendance & Leave Portal - Service Worker
+ * Attendance & Leave Portal - Offline Service Worker
  */
 
-const CACHE_NAME = 'attendance-portal-v11';
+const CACHE_NAME = 'attendance-portal-v12';
 
 const PRECACHE_ASSETS = [
   './',
   './index.html',
   './manifest.json',
-  '[https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap](https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap)',
-  '[https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css](https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css)',
-  '[https://unpkg.com/leaflet@1.9.4/dist/leaflet.css](https://unpkg.com/leaflet@1.9.4/dist/leaflet.css)',
-  '[https://unpkg.com/leaflet@1.9.4/dist/leaflet.js](https://unpkg.com/leaflet@1.9.4/dist/leaflet.js)',
-  '[https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css](https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css)',
-  '[https://cdn.jsdelivr.net/npm/flatpickr](https://cdn.jsdelivr.net/npm/flatpickr)'
+  'https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap',
+  'https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css',
+  'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css',
+  'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js',
+  'https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css',
+  'https://cdn.jsdelivr.net/npm/flatpickr'
 ];
 
-self.addEventListener('install', function(event) {
+self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME)
-      .then(function(cache) { return Promise.allSettled(PRECACHE_ASSETS.map(function(url) { return cache.add(url); })); })
-      .then(function() { return self.skipWaiting(); })
+      .then((cache) => Promise.allSettled(PRECACHE_ASSETS.map(url => cache.add(url))))
+      .then(() => self.skipWaiting())
   );
 });
 
-self.addEventListener('activate', function(event) {
+self.addEventListener('activate', (event) => {
   event.waitUntil(
-    caches.keys().then(function(cacheNames) {
+    caches.keys().then((cacheNames) => {
       return Promise.all(
-        cacheNames.map(function(cache) {
+        cacheNames.map((cache) => {
           if (cache !== CACHE_NAME) return caches.delete(cache);
         })
       );
-    }).then(function() { return self.clients.claim(); })
+    }).then(() => self.clients.claim())
   );
 });
 
-self.addEventListener('fetch', function(event) {
+self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
 
   event.respondWith(
-    caches.match(event.request).then(function(cachedResponse) {
+    caches.match(event.request).then((cachedResponse) => {
       if (cachedResponse) {
-        fetch(event.request).then(function(networkResponse) {
-          if (networkResponse && networkResponse.status === 200) {
-            caches.open(CACHE_NAME).then(function(cache) { cache.put(event.request, networkResponse); });
-          }
-        }).catch(function() {});
+        fetch(event.request)
+          .then((networkResponse) => {
+            if (networkResponse && networkResponse.status === 200) {
+              caches.open(CACHE_NAME).then((cache) => cache.put(event.request, networkResponse));
+            }
+          })
+          .catch(() => {});
         return cachedResponse;
       }
 
-      return fetch(event.request).then(function(networkResponse) {
+      return fetch(event.request).then((networkResponse) => {
         if (!networkResponse || networkResponse.status !== 200 || networkResponse.type !== 'basic') {
           return networkResponse;
         }
-        var responseToCache = networkResponse.clone();
-        caches.open(CACHE_NAME).then(function(cache) { cache.put(event.request, responseToCache); });
+        const responseToCache = networkResponse.clone();
+        caches.open(CACHE_NAME).then((cache) => cache.put(event.request, responseToCache));
         return networkResponse;
-      }).catch(function() {
+      }).catch(() => {
         if (event.request.headers.get('accept')?.includes('text/html')) {
           return caches.match('./index.html');
         }

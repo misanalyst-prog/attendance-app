@@ -10,10 +10,10 @@
 
   <title>Attendance & Leave Portal</title>
   <link rel="manifest" href="manifest.json">
-  <link href="[https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap](https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap)" rel="stylesheet">
-  <link href="[https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css](https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css)" rel="stylesheet">
-  <link rel="stylesheet" href="[https://unpkg.com/leaflet@1.9.4/dist/leaflet.css](https://unpkg.com/leaflet@1.9.4/dist/leaflet.css)" />
-  <link rel="stylesheet" href="[https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css](https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css)">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
 
   <meta name="theme-color" content="#2563eb">
 
@@ -301,7 +301,7 @@
         </select>
       </div>
 
-      <!-- District -->
+      <!-- District (Composite Key Element 1) -->
       <div class="mb-3">
         <label class="form-label">District <span class="text-danger">*</span></label>
         <select id="district" class="form-select" onchange="onDistrictChange()" required disabled>
@@ -309,7 +309,7 @@
         </select>
       </div>
 
-      <!-- Union Council -->
+      <!-- Union Council (Composite Key Element 2) -->
       <div class="mb-3">
         <label class="form-label">Union Council <span class="text-danger">*</span></label>
         <select id="unionCouncil" class="form-select" onchange="onUnionCouncilChange()" required disabled>
@@ -317,7 +317,7 @@
         </select>
       </div>
 
-      <!-- Full Name -->
+      <!-- Full Name (Composite Key Element 3) -->
       <div class="mb-3">
         <label class="form-label">Full Name <span class="text-danger">*</span></label>
         <select id="fullName" class="form-select" onchange="onFullNameChange()" required disabled>
@@ -325,7 +325,7 @@
         </select>
       </div>
 
-      <!-- Designation -->
+      <!-- Designation (Composite Key Element 4) -->
       <div class="mb-3">
         <label class="form-label">Designation <span class="text-danger">*</span></label>
         <select id="designation" class="form-select" required disabled>
@@ -333,7 +333,7 @@
         </select>
       </div>
 
-      <!-- Attendance Type -->
+      <!-- Attendance Type (Composite Key Element 5) -->
       <div class="mb-3">
         <label class="form-label d-block">Attendance Type <span class="text-danger">*</span></label>
         <div class="segmented-control">
@@ -367,7 +367,7 @@
         <div class="mb-0">
           <label class="form-label">Select Leave Date(s) <span class="text-danger">*</span></label>
           <input type="text" id="leaveDatesPicker" class="form-control" placeholder="Tap calendar to select date(s)">
-          <small class="text-muted mt-1 d-block" style="font-size:0.75rem;">Past dates are disabled. Select current or future date(s) only.</small>
+          <small class="text-muted mt-1 d-block" style="font-size:0.75rem;">Select single or non-consecutive multiple dates directly from calendar.</small>
         </div>
       </div>
 
@@ -416,8 +416,8 @@
   </div>
 </div>
 
-<script src="[https://unpkg.com/leaflet@1.9.4/dist/leaflet.js](https://unpkg.com/leaflet@1.9.4/dist/leaflet.js)"></script>
-<script src="[https://cdn.jsdelivr.net/npm/flatpickr](https://cdn.jsdelivr.net/npm/flatpickr)"></script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
 
 <script>
   // Insert your Google Apps Script Web App Deployment URL below
@@ -440,6 +440,7 @@
 
   window.addEventListener('load', () => {
     updateNetworkStatus();
+    initAntiTamperingMonitors();
     initClock();
     initLeafletMap();
     initDatePicker();
@@ -459,7 +460,9 @@
 
   window.addEventListener('offline', updateNetworkStatus);
 
+  // ----------------------------------------------------
   // ROSTER MANAGEMENT
+  // ----------------------------------------------------
   function loadRosterData() {
     const cachedData = localStorage.getItem('employee_roster_cache');
     if (cachedData) {
@@ -607,6 +610,19 @@
       items.map(i => `<option value="${i}">${i}</option>`).join('');
   }
 
+  // ----------------------------------------------------
+  // ANTI-TAMPERING & TIME MONITORS
+  // ----------------------------------------------------
+  function initAntiTamperingMonitors() {
+    setInterval(() => {
+      const now = Date.now();
+      const currentMax = parseInt(localStorage.getItem('max_historical_timestamp') || '0', 10);
+      if (now > currentMax) {
+        localStorage.setItem('max_historical_timestamp', now.toString());
+      }
+    }, 1000);
+  }
+
   function initClock() {
     updateClock();
     setInterval(updateClock, 1000);
@@ -619,6 +635,32 @@
     document.getElementById('timeDisplay').value = formatted;
   }
 
+  async function validateDeviceTime() {
+    const currentEpoch = Date.now();
+    const maxHistorical = parseInt(localStorage.getItem('max_historical_timestamp') || '0', 10);
+
+    if (maxHistorical > 0 && currentEpoch < (maxHistorical - 60000)) {
+      return {
+        valid: false,
+        message: "Manual date/time alteration detected. Please set device settings to 'Automatic Date & Time'."
+      };
+    }
+
+    const elapsedPerf = (performance.now() - loadPerfNow) / 1000;
+    const elapsedDate = (currentEpoch - loadDateNow) / 1000;
+    if (Math.abs(elapsedDate - elapsedPerf) > 45) {
+      return {
+        valid: false,
+        message: "Manual date/time alteration detected. Please set device settings to 'Automatic Date & Time'."
+      };
+    }
+
+    return { valid: true };
+  }
+
+  // ----------------------------------------------------
+  // LOCATION GPS & ANTI-SPOOFING
+  // ----------------------------------------------------
   function fetchGPSLocation() {
     const locInput = document.getElementById('locationDisplay');
     locInput.value = "Acquiring GPS coordinates...";
@@ -649,14 +691,16 @@
     );
   }
 
+  // ----------------------------------------------------
+  // CALENDAR & UI HELPERS
+  // ----------------------------------------------------
   function initDatePicker() {
     datePickerInstance = flatpickr("#leaveDatesPicker", {
       mode: "multiple",
       dateFormat: "Y-m-d",
       altInput: true,
       altFormat: "Y-m-d",
-      conjunction: ", ",
-      minDate: "today"
+      conjunction: ", "
     });
   }
 
@@ -696,6 +740,7 @@
   function setSubmitButtonState(loading, loadingText = "Processing...") {
     const btn = document.getElementById('submitBtn');
     const btnText = document.getElementById('submitBtnText');
+    
     btn.style.display = 'flex';
 
     if (loading) {
@@ -721,17 +766,28 @@
     else if (type === 'warning') bannerIcon.textContent = '!';
   }
 
+  // ----------------------------------------------------
+  // SUBMISSION LOGIC WITH EXACT STANDARD ERROR MESSAGES
+  // ----------------------------------------------------
   document.getElementById('attendanceForm').addEventListener('submit', async function(e) {
     e.preventDefault();
 
-    setSubmitButtonState(true, "Verifying Payload...");
+    setSubmitButtonState(true, "Verifying Profile Identity...");
     showBannerStatus("Validating submission request...", "info");
 
     if (isMockDetected) {
       setSubmitButtonState(false);
-      const errMsg = "Location spoofing detected. Disable mock location tools.";
+      const errMsg = "Location spoofing detected. Please disable developer options and mock location tools.";
       showBannerStatus(errMsg, "error");
       showPopup("Security Block", errMsg, "error");
+      return;
+    }
+
+    const timeCheck = await validateDeviceTime();
+    if (!timeCheck.valid) {
+      setSubmitButtonState(false);
+      showBannerStatus(timeCheck.message, "error");
+      showPopup("Security Block", timeCheck.message, "error");
       return;
     }
 
@@ -747,12 +803,13 @@
 
     if (!dist || !uc || !name || !desig) {
       setSubmitButtonState(false);
-      const errMsg = "District, Union Council, Full Name, and Designation are required.";
+      const errMsg = "District, Union Council, Full Name, and Designation are required for Composite User Key.";
       showBannerStatus(errMsg, "warning");
-      showPopup("Incomplete Selection", errMsg, "warning");
+      showPopup("Incomplete Composite Key", errMsg, "warning");
       return;
     }
 
+    // Client-side 09:00 AM Check-In Cutoff check
     if (type === 'Check-In' && timePart >= "09:00:00") {
       setSubmitButtonState(false);
       const errMsg = "Check-In is only permitted before 09:00 AM.";
@@ -764,7 +821,7 @@
     const locVal = document.getElementById('locationDisplay').value;
     if (!locVal || locVal.includes("Acquiring") || locVal.includes("Denied")) {
       setSubmitButtonState(false);
-      const errMsg = "Please enable GPS location before submitting.";
+      const errMsg = "Please ensure valid GPS location before submitting.";
       showBannerStatus(errMsg, "warning");
       showPopup("GPS Required", errMsg, "warning");
       return;
@@ -799,16 +856,6 @@
       }
       
       const leaveDates = selectedDatesRaw.split(',').map(d => d.trim()).filter(Boolean);
-      const todayStr = new Date().toISOString().split('T')[0];
-      const hasPastDate = leaveDates.some(d => d < todayStr);
-      if (hasPastDate) {
-        setSubmitButtonState(false);
-        const errMsg = "Leave request blocked: Cannot select past dates.";
-        showBannerStatus(errMsg, "error");
-        showPopup("Invalid Date", errMsg, "error");
-        return;
-      }
-
       record.leaveCategory = document.getElementById('leaveCategory').value;
       record.leaveDates = leaveDates;
       record.time = `${leaveDates[0]} 09:00:00`;
@@ -819,7 +866,7 @@
     } else {
       saveLocallyOffline(record);
       setSubmitButtonState(false);
-      const warnMsg = "Offline mode active. Record queued locally.";
+      const warnMsg = "Offline mode active. Record queued locally and will auto-sync when online.";
       showBannerStatus(warnMsg, "warning");
       showPopup("Stored Offline", warnMsg, "warning");
       resetForm();
@@ -862,7 +909,7 @@
     .catch(() => {
       setSubmitButtonState(false);
       saveLocallyOffline(record);
-      const msg = "Network issue. Saved offline for auto-sync.";
+      const msg = "Network error. Saved offline for auto-sync.";
       showBannerStatus(msg, "warning");
       showPopup("Saved Offline", msg, "warning");
       resetForm();
@@ -905,8 +952,8 @@
     updateQueueBadge();
 
     if (syncedCount > 0) {
-      showBannerStatus(`${syncedCount} offline record(s) synced to Google Sheets!`, "success");
-      showPopup("Offline Sync Complete", `${syncedCount} queued record(s) synced to Google Sheets.`, "success");
+      showBannerStatus(`${syncedCount} offline record(s) processed and synced!`, "success");
+      showPopup("Offline Sync Complete", `${syncedCount} queued record(s) processed with server rules.`, "success");
     }
   }
 

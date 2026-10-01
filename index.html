@@ -301,7 +301,7 @@
         </select>
       </div>
 
-      <!-- District (Composite Key Element 1) -->
+      <!-- District -->
       <div class="mb-3">
         <label class="form-label">District <span class="text-danger">*</span></label>
         <select id="district" class="form-select" onchange="onDistrictChange()" required disabled>
@@ -309,7 +309,7 @@
         </select>
       </div>
 
-      <!-- Union Council (Composite Key Element 2) -->
+      <!-- Union Council -->
       <div class="mb-3">
         <label class="form-label">Union Council <span class="text-danger">*</span></label>
         <select id="unionCouncil" class="form-select" onchange="onUnionCouncilChange()" required disabled>
@@ -317,7 +317,7 @@
         </select>
       </div>
 
-      <!-- Full Name (Composite Key Element 3) -->
+      <!-- Full Name -->
       <div class="mb-3">
         <label class="form-label">Full Name <span class="text-danger">*</span></label>
         <select id="fullName" class="form-select" onchange="onFullNameChange()" required disabled>
@@ -325,7 +325,7 @@
         </select>
       </div>
 
-      <!-- Designation (Composite Key Element 4) -->
+      <!-- Designation -->
       <div class="mb-3">
         <label class="form-label">Designation <span class="text-danger">*</span></label>
         <select id="designation" class="form-select" required disabled>
@@ -333,7 +333,7 @@
         </select>
       </div>
 
-      <!-- Attendance Type (Composite Key Element 5) -->
+      <!-- Attendance Type -->
       <div class="mb-3">
         <label class="form-label d-block">Attendance Type <span class="text-danger">*</span></label>
         <div class="segmented-control">
@@ -460,9 +460,7 @@
 
   window.addEventListener('offline', updateNetworkStatus);
 
-  // ----------------------------------------------------
   // ROSTER MANAGEMENT
-  // ----------------------------------------------------
   function loadRosterData() {
     const cachedData = localStorage.getItem('employee_roster_cache');
     if (cachedData) {
@@ -610,9 +608,7 @@
       items.map(i => `<option value="${i}">${i}</option>`).join('');
   }
 
-  // ----------------------------------------------------
   // ANTI-TAMPERING & TIME MONITORS
-  // ----------------------------------------------------
   function initAntiTamperingMonitors() {
     setInterval(() => {
       const now = Date.now();
@@ -658,9 +654,7 @@
     return { valid: true };
   }
 
-  // ----------------------------------------------------
   // LOCATION GPS & ANTI-SPOOFING
-  // ----------------------------------------------------
   function fetchGPSLocation() {
     const locInput = document.getElementById('locationDisplay');
     locInput.value = "Acquiring GPS coordinates...";
@@ -691,9 +685,7 @@
     );
   }
 
-  // ----------------------------------------------------
-  // CALENDAR & UI HELPERS (MIN DATE = TODAY RESTRICTION)
-  // ----------------------------------------------------
+  // CALENDAR & UI HELPERS (MIN DATE = TODAY)
   function initDatePicker() {
     datePickerInstance = flatpickr("#leaveDatesPicker", {
       mode: "multiple",
@@ -701,7 +693,7 @@
       altInput: true,
       altFormat: "Y-m-d",
       conjunction: ", ",
-      minDate: "today" // RESTRICTS SELECTION OF PAST DATES
+      minDate: "today"
     });
   }
 
@@ -767,9 +759,7 @@
     else if (type === 'warning') bannerIcon.textContent = '!';
   }
 
-  // ----------------------------------------------------
-  // SUBMISSION LOGIC WITH EXACT STANDARD ERROR MESSAGES
-  // ----------------------------------------------------
+  // SUBMISSION LOGIC
   document.getElementById('attendanceForm').addEventListener('submit', async function(e) {
     e.preventDefault();
 
@@ -810,7 +800,6 @@
       return;
     }
 
-    // Client-side 09:00 AM Check-In Cutoff check
     if (type === 'Check-In' && timePart >= "09:00:00") {
       setSubmitButtonState(false);
       const errMsg = "Check-In is only permitted before 09:00 AM.";
@@ -858,7 +847,6 @@
       
       const leaveDates = selectedDatesRaw.split(',').map(d => d.trim()).filter(Boolean);
       
-      // Client-side past date check
       const todayStr = new Date().toISOString().split('T')[0];
       const hasPastDate = leaveDates.some(d => d < todayStr);
       if (hasPastDate) {
@@ -936,6 +924,7 @@
     updateQueueBadge();
   }
 
+  // AUTO-SYNC ALL OFFLINE SUBMISSIONS TO GOOGLE SHEETS
   async function syncOfflineQueue() {
     let queue = JSON.parse(localStorage.getItem('offline_attendance_queue') || '[]');
     if (queue.length === 0) return;
@@ -965,8 +954,8 @@
     updateQueueBadge();
 
     if (syncedCount > 0) {
-      showBannerStatus(`${syncedCount} offline record(s) processed and synced!`, "success");
-      showPopup("Offline Sync Complete", `${syncedCount} queued record(s) processed with server rules.`, "success");
+      showBannerStatus(`${syncedCount} offline record(s) processed and synced to Google Sheets!`, "success");
+      showPopup("Offline Sync Complete", `${syncedCount} queued record(s) synced to Google Sheets.`, "success");
     }
   }
 
